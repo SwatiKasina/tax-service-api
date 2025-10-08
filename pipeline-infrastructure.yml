@@ -156,20 +156,6 @@ Resources:
                 DetectChanges: "true"
               OutputArtifacts:
                 - Name: SourceArtifact
-        - Name: Build
-          Actions:
-            - Name: Docker_Build
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: "1"
-              Configuration:
-                ProjectName: !Ref CodeBuildProject
-              InputArtifacts:
-                - Name: SourceArtifact
-              OutputArtifacts:
-                - Name: BuildArtifact
         - Name: Deploy_Infrastructure
           Actions:
             - Name: Deploy_CloudFormation
@@ -185,6 +171,20 @@ Resources:
                 Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
               InputArtifacts:
                 - Name: SourceArtifact
+        - Name: Build
+          Actions:
+            - Name: Docker_Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
         - Name: Deploy_Service
           Actions:
             - Name: Deploy_ECS
