@@ -268,10 +268,10 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
-      HealthCheckGracePeriodSeconds: 120
+      HealthCheckGracePeriodSeconds: 180
       DeploymentConfiguration:
         MaximumPercent: 200
-        MinimumHealthyPercent: 100
+        MinimumHealthyPercent: 50
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
