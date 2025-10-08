@@ -51,6 +51,43 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess
+      Policies:
+        - PolicyName: CodeStarConnectionAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                  - codestar-connections:GetConnection
+                  - codestar-connections:ListConnections
+                  - codestar-connections:PassConnection
+                Resource: "*"
+        - PolicyName: S3ArtifactsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !Sub "arn:aws:s3:::${ArtifactsBucket}"
+                  - !Sub "arn:aws:s3:::${ArtifactsBucket}/*"
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                  - codebuild:BatchGetBuilds
+                  - codebuild:BatchGetBuildBatches
+                Resource: !GetAtt CodeBuildProject.Arn
 
   # IAM Role for CodeBuild
   CodeBuildServiceRole:
