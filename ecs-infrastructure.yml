@@ -13,7 +13,7 @@ Parameters:
     Default: "tax-service-api"
   ContainerPort:
     Type: String
-    Default: "8080"
+    Default: "80"
 
 Resources:
   # VPC
@@ -136,14 +136,6 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
-          HealthCheck:
-            Command:
-              - CMD-SHELL
-              - curl -f http://localhost:8080/actuator/health || exit 1
-            Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 60
 
   # IAM Roles
   TaskExecutionRole:
