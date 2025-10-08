@@ -160,10 +160,8 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ClusterName: !ImportValue
-                  Fn::Sub: "${AppName}-${Environment}-cluster-name"
-                ServiceName: !ImportValue
-                  Fn::Sub: "${AppName}-${Environment}-service-name"
+                ClusterName: !Sub "${AppName}-${Environment}-cluster"
+                ServiceName: !Sub "${AppName}-${Environment}-service"
                 FileName: imageDetail.json
 
 Outputs:
