@@ -345,3 +345,9 @@ Outputs:
     Value: !Ref ECSCluster
     Export:
       Name: !Sub "${AppName}-${Environment}-cluster-name"
+
+  ServiceNameOutput:
+    Description: ECS Service Name
+    Value: !Ref EcsService
+    Export:
+      Name: !Sub "${AppName}-${Environment}-service-name"

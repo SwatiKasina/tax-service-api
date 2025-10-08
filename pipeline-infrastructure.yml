@@ -133,7 +133,23 @@ Resources:
                 - Name: BuildOutput
               Configuration:
                 ProjectName: !Ref CodeBuildProject
-        - Name: Deploy
+        - Name: DeployInfra
+          Actions:
+            - Name: Deploy_ECS_Infrastructure
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: "1"
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM
+                StackName: !Sub "${AppName}-${Environment}-ecs-stack"
+                TemplatePath: BuildOutput::ecs-infrastructure.yml
+                RoleArn: !GetAtt CodePipelineRole.Arn
+        - Name: DeployApp
           Actions:
             - Name: Deploy_to_ECS
               ActionTypeId:
@@ -144,8 +160,10 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ClusterName: !Sub "${AppName}-${Environment}-cluster"
-                ServiceName: !Sub "${AppName}-${Environment}-service"
+                ClusterName: !ImportValue
+                  Fn::Sub: "${AppName}-${Environment}-cluster-name"
+                ServiceName: !ImportValue
+                  Fn::Sub: "${AppName}-${Environment}-service-name"
                 FileName: imageDetail.json
 
 Outputs:
