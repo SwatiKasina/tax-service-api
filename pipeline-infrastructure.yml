@@ -144,7 +144,7 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ClusterName: !Ref AppName
+                ClusterName: !Sub "${AppName}-${Environment}-cluster"
                 ServiceName: !Sub "${AppName}-${Environment}-service"
                 FileName: imageDetail.json
 
