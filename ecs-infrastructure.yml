@@ -123,13 +123,21 @@ Resources:
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: app
-          Image: amazon/amazon-ecs-sample
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/tax-service-api:latest"
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
               Value: !Ref Environment
+          HealthCheck:
+            Command:
+              - "CMD-SHELL"
+              - "curl -f http://localhost:8080/actuator/health || exit 1"
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -203,9 +211,17 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Protocol: HTTP
-      Port: !Ref ContainerPort
+      Port: 80
       VpcId: !Ref VPC
-      HealthCheckPath: /
+      HealthCheckEnabled: true
+      HealthCheckPath: /actuator/health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
       TargetType: ip
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
@@ -232,6 +248,10 @@ Resources:
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
           SourceSecurityGroupId: !Ref AlbSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: "Allow all outbound traffic for ECR, RDS, and internet access"
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-service-sg"
@@ -248,6 +268,13 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 120
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
