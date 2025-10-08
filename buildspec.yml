@@ -9,7 +9,8 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      - export REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tax-service-api
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - export REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tax-service-api
       - echo $REPOSITORY_URI
       - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
 
