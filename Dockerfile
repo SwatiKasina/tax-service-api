@@ -1,5 +1,5 @@
 # Use Eclipse Temurin Java 17 JRE Alpine as base image
-FROM eclipse-temurin:17-jre-alpine
+FROM public.ecr.aws/docker/library/eclipse-temurin:17-jre-alpine
 
 # Set working directory
 WORKDIR /app
