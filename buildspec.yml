@@ -28,7 +28,7 @@ phases:
     commands:
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - docker push $REPOSITORY_URI:$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - printf '{"ImageURI":"%s:%s"}' $REPOSITORY_URI $IMAGE_TAG > imageDetail.json
+      - printf '[{"name":"app","imageUri":"%s:%s"}]' $REPOSITORY_URI $IMAGE_TAG > imageDetail.json
 
 artifacts:
   files: imageDetail.json
