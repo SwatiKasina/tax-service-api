@@ -366,4 +366,3 @@ Outputs:
   TaskDefinitionArn:
     Description: Task Definition ARN
     Value: !Ref TaskDefinition
-
