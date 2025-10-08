@@ -90,6 +90,27 @@ Resources:
                 Action:
                   - codestar-connections:UseConnection
                 Resource: !Ref CodeStarConnectionArn
+        - PolicyName: AllowPassToECSRoles
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/${AppName}-${Environment}-*"
+
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-cloudformation-exec-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
 
   ArtifactBucket:
     Type: AWS::S3::Bucket
@@ -148,7 +169,7 @@ Resources:
                 Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM
                 StackName: !Sub "${AppName}-${Environment}-ecs-stack"
                 TemplatePath: BuildOutput::ecs-infrastructure.yml
-                RoleArn: !GetAtt CodePipelineRole.Arn
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn
         - Name: DeployApp
           Actions:
             - Name: Deploy_to_ECS

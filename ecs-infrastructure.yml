@@ -103,14 +103,6 @@ Resources:
     Properties:
       Domain: vpc
 
-  # ECR Repository
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Ref AppName
-      ImageScanningConfiguration:
-        ScanOnPush: true
-
   # ECS Resources
   ECSCluster:
     Type: AWS::ECS::Cluster
@@ -335,11 +327,6 @@ Outputs:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
-  ECRRepository:
-    Description: ECR Repository URL
-    Value: !GetAtt ECRRepository.RepositoryUri
-    Export:
-      Name: !Sub "${AppName}-${Environment}-ecr-repo"
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
