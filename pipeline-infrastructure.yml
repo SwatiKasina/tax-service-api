@@ -17,10 +17,9 @@ Parameters:
   GitHubBranch:
     Type: String
     Default: "main"
-  GitHubOAuthToken:
+  CodeStarConnectionArn:
     Type: String
-    NoEcho: true
-    Description: "GitHub Personal Access Token"
+    Description: "ARN of the existing CodeStar Connections GitHub connection"
 
 Resources:
   CodeBuildRole:
@@ -37,7 +36,7 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
         - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AmazonECSFullAccess
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -67,9 +66,9 @@ Resources:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+        - arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess
         - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
-        - arn:aws:iam::aws:policy/AmazonECSFullAccess
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
 
   ArtifactBucket:
@@ -91,16 +90,15 @@ Resources:
             - Name: GitHub_Source
               ActionTypeId:
                 Category: Source
-                Owner: ThirdParty
-                Provider: GitHub
+                Owner: AWS
+                Provider: CodeStarSourceConnection
                 Version: "1"
               OutputArtifacts:
                 - Name: SourceOutput
               Configuration:
-                Owner: !Ref GitHubOwner
-                Repo: !Ref GitHubRepo
-                Branch: !Ref GitHubBranch
-                OAuthToken: !Ref GitHubOAuthToken
+                ConnectionArn: !Ref CodeStarConnectionArn
+                FullRepositoryId: !Sub "${GitHubOwner}/${GitHubRepo}"
+                BranchName: !Ref GitHubBranch
         - Name: Build
           Actions:
             - Name: Build_Docker_Image
@@ -126,8 +124,7 @@ Resources:
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ClusterName: !ImportValue
-                  Fn::Sub: "${AppName}-${Environment}-cluster-name"
+                ClusterName: !Ref AppName
                 ServiceName: !Sub "${AppName}-${Environment}-service"
                 FileName: imageDetail.json
 
