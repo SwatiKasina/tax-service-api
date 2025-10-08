@@ -13,7 +13,7 @@ Parameters:
     Default: "tax-service-api"
   ContainerPort:
     Type: String
-    Default: "80"
+    Default: "8080"
 
 Resources:
   # VPC
