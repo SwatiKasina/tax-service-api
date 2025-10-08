@@ -130,14 +130,6 @@ Resources:
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
               Value: !Ref Environment
-          HealthCheck:
-            Command:
-              - "CMD-SHELL"
-              - "curl -f http://localhost:8080/actuator/health || exit 1"
-            Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 60
           LogConfiguration:
             LogDriver: awslogs
             Options:
