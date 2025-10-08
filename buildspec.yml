@@ -1,0 +1,31 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: "latest"
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - export REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tax-service-api
+      - echo $REPOSITORY_URI
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
+
+  build:
+    commands:
+      - echo Build started on $(date)
+      - mvn clean package -DskipTests
+      - docker build -t tax-service-api .
+      - docker tag tax-service-api:latest $REPOSITORY_URI:$IMAGE_TAG
+      - docker tag tax-service-api:latest $REPOSITORY_URI:$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+  post_build:
+    commands:
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - printf '{"ImageURI":"%s:%s"}' $REPOSITORY_URI $IMAGE_TAG > imageDetail.json
+
+artifacts:
+  files: imageDetail.json

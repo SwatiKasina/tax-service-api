@@ -28,6 +28,8 @@ public class TaxConfigService {
     }
 
     public TaxConfig getConfigById(Long id) {
+
+        // fix this one for me dolly
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("TaxConfig not found with id: " + id));
     }

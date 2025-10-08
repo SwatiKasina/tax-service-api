@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS CodePipeline infrastructure for Tax Service API"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: "prod"
+    AllowedValues:
+      - prod
+      - staging
+  AppName:
+    Type: String
+    Default: "tax-service-api"
+  GitHubOwner:
+    Type: String
+    Default: "SwatiKasina"
+  GitHubRepo:
+    Type: String
+    Default: "tax-service-api"
+  GitHubBranch:
+    Type: String
+    Default: "main"
+  GitHubConnectionArn:
+    Type: String
+    Description: "ARN of the CodeStar GitHub connection"
+
+Resources:
+  # S3 Bucket for CodePipeline artifacts
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AppName}-${AWS::AccountId}-artifacts"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # IAM Role for CodePipeline
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-codepipeline-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess
+
+  # IAM Role for CodeBuild
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-codebuild-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
+        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+
+  # CodeBuild Project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-build"
+      Description: !Sub "Build project for ${AppName} ${Environment}"
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub "/aws/codebuild/${AppName}-${Environment}-build"
+          StreamName: build
+          Status: ENABLED
+
+  # CodePipeline
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-pipeline"
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactsBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHub_Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: "1"
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Sub "${GitHubOwner}/${GitHubRepo}"
+                BranchName: !Ref GitHubBranch
+                DetectChanges: "true"
+              OutputArtifacts:
+                - Name: SourceArtifact
+        - Name: Build
+          Actions:
+            - Name: Docker_Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+        - Name: Deploy_Infrastructure
+          Actions:
+            - Name: Deploy_CloudFormation
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: "1"
+              Configuration:
+                StackName: !Sub "${AppName}-${Environment}-infrastructure"
+                TemplatePath: "SourceArtifact::ecs-infrastructure.yml"
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
+              InputArtifacts:
+                - Name: SourceArtifact
+        - Name: Deploy_Service
+          Actions:
+            - Name: Deploy_ECS
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: "1"
+              Configuration:
+                ClusterName: !Sub "${AppName}-${Environment}-cluster"
+                ServiceName: !Sub "${AppName}-${Environment}-service"
+                FileName: "BuildArtifact::imageDetail.json"
+              InputArtifacts:
+                - Name: BuildArtifact
+
+Outputs:
+  PipelineName:
+    Description: CodePipeline name
+    Value: !Ref CodePipeline
+  CodeBuildProjectName:
+    Description: CodeBuild project name
+    Value: !Ref CodeBuildProject
+  ArtifactsBucketName:
+    Description: S3 bucket for artifacts
+    Value: !Ref ArtifactsBucket
+  PipelineRoleArn:
+    Description: CodePipeline service role ARN
+    Value: !GetAtt CodePipelineServiceRole.Arn
+  CodeBuildRoleArn:
+    Description: CodeBuild service role ARN
+    Value: !GetAtt CodeBuildServiceRole.Arn
