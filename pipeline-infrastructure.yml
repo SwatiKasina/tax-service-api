@@ -37,6 +37,17 @@ Resources:
         - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
         - arn:aws:iam::aws:policy/AmazonECS_FullAccess
+      Policies:
+        - PolicyName: CodeBuildLoggingAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -70,6 +81,15 @@ Resources:
         - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
         - arn:aws:iam::aws:policy/AmazonECS_FullAccess
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Policies:
+        - PolicyName: UseConnection
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                Resource: !Ref CodeStarConnectionArn
 
   ArtifactBucket:
     Type: AWS::S3::Bucket
