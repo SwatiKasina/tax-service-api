@@ -208,16 +208,16 @@ Resources:
       HealthCheckEnabled: true
       HealthCheckPath: /actuator/health
       HealthCheckProtocol: HTTP
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
       Matcher:
-        HttpCode: "200"
+        HttpCode: "200-499"
       TargetType: ip
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: "30"
+          Value: "15"
 
   AlbListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -252,8 +252,8 @@ Resources:
     Type: AWS::ECS::Service
     DependsOn:
       - TaskDefinition
+      - ApplicationLoadBalancer
       - AlbListener
-      - AlbTargetGroup
     Properties:
       ServiceName: !Sub "${AppName}-${Environment}-service"
       Cluster: !Ref ECSCluster
