@@ -226,7 +226,7 @@ Resources:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: arn:aws:acm:us-east-1:<your-account-id>:certificate/<certificate-id>
+        - CertificateArn: arn:aws:acm:us-east-1:166538851957:certificate/93fd0480-0153-40c3-8e02-bab5fd15750f
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref AlbTargetGroup
@@ -336,7 +336,7 @@ Resources:
 Outputs:
   AlbUrlHTTPS:
     Description: HTTPS URL of the Application Load Balancer
-    Value: !Sub "https://${ApplicationLoadBalancer.DNSName}"
+    Value: !Sub "https://api.tkpshivatemple.com"
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-https-url"
   ClusterName:
