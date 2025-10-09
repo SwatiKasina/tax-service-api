@@ -255,7 +255,7 @@ Resources:
     DependsOn:
       - TaskDefinition
       - ApplicationLoadBalancer
-      - AlbListener
+      - AlbListenerHTTPS
     Properties:
       ServiceName: !Sub "${AppName}-${Environment}-service"
       Cluster: !Ref ECSCluster
