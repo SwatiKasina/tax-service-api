@@ -219,12 +219,14 @@ Resources:
         - Key: deregistration_delay.timeout_seconds
           Value: "15"
 
-  AlbListener:
+  AlbListenerHTTPS:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       LoadBalancerArn: !GetAtt ApplicationLoadBalancer.LoadBalancerArn
-      Port: 80
-      Protocol: HTTP
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: arn:aws:acm:us-east-1:<your-account-id>:certificate/<certificate-id>
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref AlbTargetGroup
@@ -332,11 +334,11 @@ Resources:
             Action: sts:AssumeRole
 
 Outputs:
-  AlbUrl:
-    Description: URL of the Application Load Balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  AlbUrlHTTPS:
+    Description: HTTPS URL of the Application Load Balancer
+    Value: !Sub "https://${ApplicationLoadBalancer.DNSName}"
     Export:
-      Name: !Sub "${AppName}-${Environment}-alb-url"
+      Name: !Sub "${AppName}-${Environment}-alb-https-url"
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
