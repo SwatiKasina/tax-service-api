@@ -88,6 +88,42 @@ Resources:
                   - codebuild:BatchGetBuilds
                   - codebuild:BatchGetBuildBatches
                 Resource: !GetAtt CodeBuildProject.Arn
+        - PolicyName: CloudFormationAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:GetTemplate
+                Resource: !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/${AppName}-${Environment}-infrastructure/*"
+        - PolicyName: IAMPassRole
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+
+  # IAM Role for CloudFormation Execution
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-cloudformation-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
 
   # IAM Role for CodeBuild
   CodeBuildServiceRole:
@@ -168,7 +204,8 @@ Resources:
                 StackName: !Sub "${AppName}-${Environment}-infrastructure"
                 TemplatePath: "SourceArtifact::ecs-infrastructure.yml"
                 ActionMode: CREATE_UPDATE
-                Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn
+                Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
               InputArtifacts:
                 - Name: SourceArtifact
         - Name: Build

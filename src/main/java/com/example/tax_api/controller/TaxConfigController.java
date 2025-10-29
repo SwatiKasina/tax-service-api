@@ -8,37 +8,41 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
-@RequestMapping("/api/tax")
+@RequestMapping("/api/tax/config")
 @Slf4j
 @RequiredArgsConstructor
 public class TaxConfigController {
 
     private final TaxConfigService service;
 
-    @GetMapping("/config")
+    // ✅ GET /api/tax/config
+    @GetMapping
     public List<TaxConfig> getAllConfigs() {
         return service.getAllConfigs();
     }
 
-    @GetMapping("/config/query")
+    // ✅ GET /api/tax/config/query
+    @GetMapping("/query")
     public List<TaxConfig> getListFromQuery() {
         log.info("Getting data using custom query");
         return service.getListFromQuery();
     }
 
-    @GetMapping("/config/{id}")
+    // ✅ GET /api/tax/config/{id}
+    @GetMapping("/{id}")
     public TaxConfig getConfigById(@PathVariable Long id) {
         return service.getConfigById(id);
     }
 
-    @PostMapping("/config")
+    // ✅ POST /api/tax/config
+    @PostMapping
     public TaxConfig createConfig(@RequestBody TaxConfig config) {
         return service.createConfig(config);
     }
 
-    @DeleteMapping("/config/{id}")
+    // ✅ DELETE /api/tax/config/{id}
+    @DeleteMapping("/{id}")
     public void deleteConfig(@PathVariable Long id) {
         service.deleteConfig(id);
     }

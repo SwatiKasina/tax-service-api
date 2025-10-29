@@ -2,7 +2,9 @@ package com.example.tax_api.service;
 
 import com.example.tax_api.model.TaxConfig;
 import com.example.tax_api.repository.TaxConfigRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -28,10 +30,9 @@ public class TaxConfigService {
     }
 
     public TaxConfig getConfigById(Long id) {
-
-        // fix this one for me dolly
         return repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("TaxConfig not found with id: " + id));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "TaxConfig not found with id: " + id));
     }
 
     public void deleteConfig(Long id) {
