@@ -29,5 +29,6 @@ phases:
       - printf '{"ImageURI":"%s:%s"}' $REPOSITORY_URI $IMAGE_TAG > imageDetail.json
 
 artifacts:
-  files: imageDetail.json
+  files:
+    - imageDetail.json
     - ecs-infrastructure.yml
