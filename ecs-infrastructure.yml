@@ -101,7 +101,7 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # ----------------------
-  # NAT (optional, future private usage)
+  # NAT (optional, for future private subnets)
   # ----------------------
   NatEip:
     Type: AWS::EC2::EIP
@@ -209,7 +209,7 @@ Resources:
             StartPeriod: 60
 
   # ----------------------
-  # ALB + SG
+  # ALB + Security Group
   # ----------------------
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
