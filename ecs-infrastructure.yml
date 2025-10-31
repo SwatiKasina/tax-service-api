@@ -5,9 +5,7 @@ Parameters:
   Environment:
     Type: String
     Default: "prod"
-    AllowedValues:
-      - prod
-      - staging
+    AllowedValues: [prod, staging]
 
   AppName:
     Type: String
@@ -145,8 +143,7 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
+            Principal: { Service: ecs-tasks.amazonaws.com }
             Action: sts:AssumeRole
 
   TaskRole:
@@ -157,8 +154,7 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
+            Principal: { Service: ecs-tasks.amazonaws.com }
             Action: sts:AssumeRole
 
   # ----------------------
@@ -178,8 +174,7 @@ Resources:
     Properties:
       Family: !Sub "${AppName}-${Environment}-task"
       NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
+      RequiresCompatibilities: [FARGATE]
       Cpu: "512"
       Memory: "1024"
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
@@ -225,7 +220,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-sg"
         - Key: Version
-          Value: "2025-10-31-01"   # harmless bump; bump when needed
+          Value: "2025-10-31-13"   # << bumped
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -241,6 +236,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb"
+        - Key: InfraRevision
+          Value: "2025-10-31-13"   # << added/bumped
 
   AlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -294,8 +291,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsServiceSecurityGroup
+          SecurityGroups: [!Ref EcsServiceSecurityGroup]
           Subnets:
             - !Ref PublicSubnet1
             - !Ref PublicSubnet2
@@ -317,8 +313,7 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal:
-              Service: application-autoscaling.amazonaws.com
+            Principal: { Service: application-autoscaling.amazonaws.com }
             Action: sts:AssumeRole
 
   ScalableTarget:
@@ -378,4 +373,4 @@ Outputs:
 
   InfraRevision:
     Description: Bump to force a non-empty change set
-    Value: "r2025-10-31-01"
+    Value: "r2025-10-31-13"
