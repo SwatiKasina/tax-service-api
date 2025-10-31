@@ -224,6 +224,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-sg"
+        - Key: Version
+          Value: "2025-10-31-01"   # harmless bump; bump when needed
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -373,3 +375,7 @@ Outputs:
     Value: !Ref ECSCluster
     Export:
       Name: !Sub "${AppName}-${Environment}-cluster-name"
+
+  InfraRevision:
+    Description: Bump to force a non-empty change set
+    Value: "r2025-10-31-01"
