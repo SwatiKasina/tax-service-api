@@ -3,7 +3,8 @@ version: 0.2
 env:
   variables:
     IMAGE_TAG: "latest"
-
+    ECR_REPO_NAME: "tax-service-api"
+    AWS_REGION: "us-east-1"
 phases:
   pre_build:
     commands:

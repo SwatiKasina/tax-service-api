@@ -5,16 +5,23 @@ Parameters:
   Environment:
     Type: String
     Default: "prod"
-
     AllowedValues:
       - prod
       - staging
+
   AppName:
     Type: String
     Default: "tax-service-api"
+
   ContainerPort:
     Type: String
     Default: "8080"
+
+  ExistingEcrRepoName:
+    Type: String
+    Default: "tax-service-api"
+    Description: "Name of the existing ECR repository to use"
+
 
 Resources:
   # VPC
@@ -46,7 +53,10 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs !Ref "AWS::Region"]
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -57,14 +67,18 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs !Ref "AWS::Region"]
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: AWS::Region
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-public-az2"
 
-  # Route Table
+
+    # Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -104,13 +118,7 @@ Resources:
     Properties:
       Domain: vpc
 
-  # ECR Repository
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Ref AppName
-      ImageScanningConfiguration:
-        ScanOnPush: true
+
 
   # ECS Resources
   ECSCluster:
@@ -132,7 +140,8 @@ Resources:
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: app
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AppName}:latest"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
+
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -332,11 +341,7 @@ Outputs:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
-  ECRRepository:
-    Description: ECR Repository URL
-    Value: !GetAtt ECRRepository.RepositoryUri
-    Export:
-      Name: !Sub "${AppName}-${Environment}-ecr-repo"
+
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
