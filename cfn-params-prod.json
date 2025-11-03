@@ -1,0 +1,7 @@
+{
+  "Parameters": {
+    "ExistingEcrRepoName": "tax-service-api",
+    "ImageTag": "latest"
+  },
+  "Tags": {}
+}
