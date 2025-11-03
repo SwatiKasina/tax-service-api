@@ -5,17 +5,21 @@ Parameters:
   Environment:
     Type: String
     Default: "prod"
+ ECSinfra-updated-files
     AllowedValues:
       - prod
       - staging
+
+    AllowedValues: [prod, staging]
+ main
 
   AppName:
     Type: String
     Default: "tax-service-api"
 
   ContainerPort:
-    Type: String
-    Default: "8080"
+    Type: Number
+    Default: 8080
 
   ExistingEcrRepoName:
     Type: String
@@ -24,7 +28,9 @@ Parameters:
 
 
 Resources:
-  # VPC
+  # ----------------------
+  # Networking (VPC + IGW)
+  # ----------------------
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -48,15 +54,21 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  # Subnets - 2 public, 2 private (ECS tasks need public for ECR pull, but ALB can use public)
+  # ----------------------
+  # Public Subnets (2 AZs)
+  # ----------------------
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+ ECSinfra-updated-files
       AvailabilityZone: !Select
         - 0
         - !GetAZs
           Ref: AWS::Region
+
+      AvailabilityZone: !Select [0, !GetAZs '']
+ main
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -67,18 +79,28 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+ ECSinfra-updated-files
       AvailabilityZone: !Select
         - 1
         - !GetAZs
           Ref: AWS::Region
+
+      AvailabilityZone: !Select [1, !GetAZs '']
+ main
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-public-az2"
 
+ ECSinfra-updated-files
 
     # Route Table
+
+  
+  # Routing for Public Subnets
+  # ----------------------
+ main
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -89,6 +111,7 @@ Resources:
 
   PublicRoute:
     Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
@@ -106,42 +129,102 @@ Resources:
       SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
 
-  # NAT Gateway (for future private subnets)
+  # ----------------------
+  # NAT (optional, for future private subnets)
+  # ----------------------
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
   NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
       AllocationId: !GetAtt NatEip.AllocationId
       SubnetId: !Ref PublicSubnet1
-
+ ECSinfra-updated-files
   NatEip:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
 
+  # ----------------------
+  # ECR Repository
+  # ----------------------
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref AppName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+ main
 
-  # ECS Resources
+  # ----------------------
+  # ECS Cluster
+  # ----------------------
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${AppName}-${Environment}-cluster"
 
+  # ----------------------
+  # IAM Roles for ECS
+  # ----------------------
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-task-execution-role"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-task-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+
+  # ----------------------
+  # CloudWatch Log Group
+  # ----------------------
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
+      RetentionInDays: 30
+
+  # ----------------------
   # Task Definition
+  # ----------------------
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
       Family: !Sub "${AppName}-${Environment}-task"
       NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: 512
-      Memory: 1024
+      RequiresCompatibilities: [FARGATE]
+      Cpu: "512"
+      Memory: "1024"
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: app
+ ECSinfra-updated-files
           Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
 
+
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}:latest"
+ main
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -152,50 +235,20 @@ Resources:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref AWS::Region
+              awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
               - CMD-SHELL
-              - curl -f http://localhost:8080/actuator/health || exit 1
+              - !Sub "curl -f http://localhost:${ContainerPort}/actuator/health || exit 1"
             Interval: 30
             Timeout: 5
             Retries: 3
             StartPeriod: 60
 
-  # IAM Roles
-  TaskExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-execution-role"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-
-  TaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-role"
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-
-  # CloudWatch Logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
-      RetentionInDays: 30
-
-  # ALB
+  # ----------------------
+  # ALB + Security Group
+  # ----------------------
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -209,6 +262,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-sg"
+        - Key: Version
+          Value: "2025-10-31-13"   # << bumped
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -224,6 +279,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb"
+        - Key: InfraRevision
+          Value: "2025-10-31-13"   # << added/bumped
 
   AlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -248,7 +305,9 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref AlbTargetGroup
 
-  # ECS Service
+  # ----------------------
+  # ECS Service + SG
+  # ----------------------
   EcsServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -275,8 +334,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsServiceSecurityGroup
+          SecurityGroups: [!Ref EcsServiceSecurityGroup]
           Subnets:
             - !Ref PublicSubnet1
             - !Ref PublicSubnet2
@@ -285,7 +343,22 @@ Resources:
           ContainerPort: !Ref ContainerPort
           TargetGroupArn: !Ref AlbTargetGroup
 
-  # Auto Scaling
+  # ----------------------
+  # Service Auto Scaling
+  # ----------------------
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-autoscaling-role"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: application-autoscaling.amazonaws.com }
+            Action: sts:AssumeRole
+
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
@@ -322,19 +395,6 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
 
-  AutoScalingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AppName}-${Environment}-autoscaling-role"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: application-autoscaling.amazonaws.com
-            Action: sts:AssumeRole
-
 Outputs:
   AlbUrl:
     Description: URL of the Application Load Balancer
@@ -342,8 +402,20 @@ Outputs:
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
 
+ ECSinfra-updated-files
+
+  ECRRepository:
+    Description: ECR Repository URL
+    Value: !GetAtt ECRRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AppName}-${Environment}-ecr-repo"
+ main
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
     Export:
       Name: !Sub "${AppName}-${Environment}-cluster-name"
+
+  InfraRevision:
+    Description: Bump to force a non-empty change set
+    Value: "r2025-10-31-13"
