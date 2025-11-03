@@ -4,18 +4,12 @@ Description: "ECS Infrastructure for Tax Service API"
 Parameters:
   Environment:
     Type: String
-    Default: "prod"
- ECSinfra-updated-files
-    AllowedValues:
-      - prod
-      - staging
-
+    Default: prod
     AllowedValues: [prod, staging]
- main
 
   AppName:
     Type: String
-    Default: "tax-service-api"
+    Default: tax-service-api
 
   ContainerPort:
     Type: Number
@@ -23,9 +17,11 @@ Parameters:
 
   ExistingEcrRepoName:
     Type: String
-    Default: "tax-service-api"
-    Description: "Name of the existing ECR repository to use"
+    Default: tax-service-api
+    Description: "Existing ECR repo to use in prod. Staging creates its own."
 
+Conditions:
+  CreateEcrRepo: !Equals [!Ref Environment, "staging"]
 
 Resources:
   # ----------------------
@@ -61,14 +57,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
- ECSinfra-updated-files
-      AvailabilityZone: !Select
-        - 0
-        - !GetAZs
-          Ref: AWS::Region
-
-      AvailabilityZone: !Select [0, !GetAZs '']
- main
+      AvailabilityZone: !Select [0, !GetAZs ""]
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -79,28 +68,16 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
- ECSinfra-updated-files
-      AvailabilityZone: !Select
-        - 1
-        - !GetAZs
-          Ref: AWS::Region
-
-      AvailabilityZone: !Select [1, !GetAZs '']
- main
+      AvailabilityZone: !Select [1, !GetAZs ""]
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-public-az2"
 
- ECSinfra-updated-files
-
-    # Route Table
-
-  
+  # ----------------------
   # Routing for Public Subnets
   # ----------------------
- main
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -142,23 +119,18 @@ Resources:
     Properties:
       AllocationId: !GetAtt NatEip.AllocationId
       SubnetId: !Ref PublicSubnet1
- ECSinfra-updated-files
-  NatEip:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
 
   # ----------------------
-  # ECR Repository
+  # ECR Repository (only for staging)
   # ----------------------
   ECRRepository:
     Type: AWS::ECR::Repository
+    Condition: CreateEcrRepo
     Properties:
-      RepositoryName: !Ref AppName
+      RepositoryName: !Sub "${AppName}-${Environment}"
+      ImageTagMutability: IMMUTABLE
       ImageScanningConfiguration:
         ScanOnPush: true
- main
 
   # ----------------------
   # ECS Cluster
@@ -170,29 +142,30 @@ Resources:
 
   # ----------------------
   # IAM Roles for ECS
+  # (no explicit RoleName to avoid name collisions)
   # ----------------------
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-execution-role"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: { Service: ecs-tasks.amazonaws.com }
+            Principal:
+              Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: { Service: ecs-tasks.amazonaws.com }
+            Principal:
+              Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
   # ----------------------
@@ -219,12 +192,14 @@ Resources:
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: app
- ECSinfra-updated-files
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
-
-
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}:latest"
- main
+          Image: !Sub
+            - "${Account}.dkr.ecr.${Region}.amazonaws.com/${Repo}:latest"
+            - Account: !Ref "AWS::AccountId"
+              Region: !Ref "AWS::Region"
+              Repo: !If
+                - CreateEcrRepo
+                - !Sub "${AppName}-${Environment}"
+                - !Ref ExistingEcrRepoName
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -235,7 +210,7 @@ Resources:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref 'AWS::Region'
+              awslogs-region: !Ref "AWS::Region"
               awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
@@ -262,8 +237,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-sg"
-        - Key: Version
-          Value: "2025-10-31-13"   # << bumped
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -279,8 +252,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb"
-        - Key: InfraRevision
-          Value: "2025-10-31-13"   # << added/bumped
 
   AlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -349,14 +320,14 @@ Resources:
   AutoScalingRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-autoscaling-role"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: { Service: application-autoscaling.amazonaws.com }
+            Principal:
+              Service: application-autoscaling.amazonaws.com
             Action: sts:AssumeRole
 
   ScalableTarget:
@@ -402,14 +373,13 @@ Outputs:
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
 
- ECSinfra-updated-files
-
-  ECRRepository:
-    Description: ECR Repository URL
+  ECRRepositoryUri:
+    Condition: CreateEcrRepo
+    Description: "ECR Repository URI (staging only)"
     Value: !GetAtt ECRRepository.RepositoryUri
     Export:
       Name: !Sub "${AppName}-${Environment}-ecr-repo"
- main
+
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
@@ -418,4 +388,4 @@ Outputs:
 
   InfraRevision:
     Description: Bump to force a non-empty change set
-    Value: "r2025-10-31-13"
+    Value: "r2025-11-03-01"
