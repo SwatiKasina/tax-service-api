@@ -1,8 +1,9 @@
+
 version: 0.2
 
 env:
   variables:
-    ECR_REPOSITORY: "tax-service-api"   # existing repo
+    ECR_REPOSITORY: "tax-service-api"
     IMAGE_TAG: "latest"
 
 phases:
@@ -11,13 +12,12 @@ phases:
       - echo "Logging in to Amazon ECR..."
       - aws --version
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      - REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+      - REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
       - REPOSITORY_URI="${REGISTRY}/${ECR_REPOSITORY}"
       - echo "REGISTRY = ${REGISTRY}"
       - echo "REPO URI = ${REPOSITORY_URI}"
-      # login to the REGISTRY (not the repo path)
-      - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" \
-        | docker login --username AWS --password-stdin "${REGISTRY}"
+      - aws ecr get-login-password --region "${REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
 
   build:
     commands:
@@ -32,14 +32,10 @@ phases:
     commands:
       - docker push "${REPOSITORY_URI}:${IMAGE_TAG}"
       - docker push "${REPOSITORY_URI}:${SHORT_SHA}"
-      # File that the ECS deploy action reads (container name must match your TaskDefinition)
-      - CONTAINER_NAME="app"
+      - CONTAINER_NAME="app"   # must match your ECS task definition
       - printf '[{"name":"%s","imageUri":"%s:%s"}]' "$CONTAINER_NAME" "$REPOSITORY_URI" "$IMAGE_TAG" > imagedefinitions.json
-      # (optional) keep this for CloudFormation-driven flows
-      - printf '{"ImageURI":"%s:%s"}' "$REPOSITORY_URI" "$IMAGE_TAG" > imageDetail.json
 
 artifacts:
   files:
     - imagedefinitions.json
-    - imageDetail.json
     - ecs-infrastructure.yml
