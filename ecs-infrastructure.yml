@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "ECS Fargate + ALB with optional ECR (use existing repo in prod)"
+Description: "ECS Fargate + ALB with optional ECR & LogGroup (use existing in prod)"
 
 Parameters:
   Environment:
@@ -39,6 +39,7 @@ Parameters:
     Type: String
     Default: latest
 
+  # ---- ECR toggle ----
   CreateEcrRepo:
     Type: String
     AllowedValues: ['true','false']
@@ -46,10 +47,21 @@ Parameters:
 
   ExistingEcrRepoName:
     Type: String
-    Default: tax-service-api     # your already-existing repo
+    Default: tax-service-api     # already-existing repo
+
+  # ---- Log Group toggle ----
+  CreateLogGroup:
+    Type: String
+    AllowedValues: ['true','false']
+    Default: 'false'             # prod => false
+
+  ExistingLogGroupName:
+    Type: String
+    Default: /ecs/tax-service-api-prod  # set to your existing group name
 
 Conditions:
-  CreateEcrRepoCond: !Equals [!Ref CreateEcrRepo, 'true']
+  CreateEcrRepoCond:  !Equals [!Ref CreateEcrRepo,  'true']
+  CreateLogGroupCond: !Equals [!Ref CreateLogGroup, 'true']
 
 Resources:
   # ----------------------
@@ -148,8 +160,12 @@ Resources:
     Properties:
       ClusterName: !Sub "${AppName}-${Environment}-cluster"
 
+  # Log group (optional)
   AppLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: CreateLogGroupCond
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
       RetentionInDays: 14
@@ -206,7 +222,10 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref AppLogGroup
+              awslogs-group: !If
+                - CreateLogGroupCond
+                - !Ref AppLogGroup
+                - !Ref ExistingLogGroupName
               awslogs-region: !Ref "AWS::Region"
               awslogs-stream-prefix: !Ref AppName
           Environment:
@@ -325,3 +344,10 @@ Outputs:
           - CreateEcrRepoCond
           - !Sub "${AppName}-${Environment}"
           - !Ref ExistingEcrRepoName
+
+  LogGroupUsed:
+    Description: "CloudWatch Logs group used by the task"
+    Value: !If
+      - CreateLogGroupCond
+      - !Ref AppLogGroup
+      - !Ref ExistingLogGroupName
