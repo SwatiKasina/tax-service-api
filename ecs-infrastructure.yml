@@ -5,7 +5,13 @@ Parameters:
   Environment:
     Type: String
     Default: "prod"
+ ECSinfra-updated-files
+    AllowedValues:
+      - prod
+      - staging
+
     AllowedValues: [prod, staging]
+ main
 
   AppName:
     Type: String
@@ -14,6 +20,12 @@ Parameters:
   ContainerPort:
     Type: Number
     Default: 8080
+
+  ExistingEcrRepoName:
+    Type: String
+    Default: "tax-service-api"
+    Description: "Name of the existing ECR repository to use"
+
 
 Resources:
   # ----------------------
@@ -49,7 +61,14 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+ ECSinfra-updated-files
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs
+          Ref: AWS::Region
+
       AvailabilityZone: !Select [0, !GetAZs '']
+ main
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -60,16 +79,28 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+ ECSinfra-updated-files
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs
+          Ref: AWS::Region
+
       AvailabilityZone: !Select [1, !GetAZs '']
+ main
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-public-az2"
 
-  # ----------------------
+ ECSinfra-updated-files
+
+    # Route Table
+
+  
   # Routing for Public Subnets
   # ----------------------
+ main
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -111,6 +142,12 @@ Resources:
     Properties:
       AllocationId: !GetAtt NatEip.AllocationId
       SubnetId: !Ref PublicSubnet1
+ ECSinfra-updated-files
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
 
   # ----------------------
   # ECR Repository
@@ -121,6 +158,7 @@ Resources:
       RepositoryName: !Ref AppName
       ImageScanningConfiguration:
         ScanOnPush: true
+ main
 
   # ----------------------
   # ECS Cluster
@@ -181,7 +219,12 @@ Resources:
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
         - Name: app
+ ECSinfra-updated-files
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
+
+
           Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}:latest"
+ main
           PortMappings:
             - ContainerPort: !Ref ContainerPort
               Protocol: tcp
@@ -359,12 +402,14 @@ Outputs:
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
 
+ ECSinfra-updated-files
+
   ECRRepository:
     Description: ECR Repository URL
     Value: !GetAtt ECRRepository.RepositoryUri
     Export:
       Name: !Sub "${AppName}-${Environment}-ecr-repo"
-
+ main
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
