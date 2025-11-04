@@ -8,6 +8,11 @@ Parameters:
     AllowedValues:
       - prod
       - staging
+      - ExistingLogGroupName:
+          Type: String
+          Default: "/ecs/tax-service-api-prod"
+          Description: "Existing CloudWatch Log Group to use for ECS logs in prod"
+
   AppName:
     Type: String
     Default: "tax-service-api"
@@ -148,7 +153,7 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref LogGroup
+              awslogs-group: !Ref ExistingLogGroupName
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           HealthCheck:
@@ -185,12 +190,7 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
-  # CloudWatch Logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
-      RetentionInDays: 30
+
 
   # ALB
   AlbSecurityGroup:
