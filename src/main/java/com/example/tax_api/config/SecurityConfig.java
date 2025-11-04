@@ -12,13 +12,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain security(HttpSecurity http) throws Exception {
         return http
-                .cors(Customizer.withDefaults())     // enable CORS support
-                .csrf(csrf -> csrf.disable())        // disable if you're stateless API
+                .cors(Customizer.withDefaults()) // enable CORS support
+                .csrf(csrf -> csrf.disable()) // disable if you're stateless API
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()   // preflight
+                        .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll() // preflight
                         .requestMatchers(HttpMethod.GET, "/api/tax/config").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .requestMatchers("/actuator/**").permitAll() // allow actuator endpoints for health checks
+                        .anyRequest().authenticated())
                 .build();
     }
 }

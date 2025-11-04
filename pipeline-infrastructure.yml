@@ -23,8 +23,28 @@ Parameters:
   GitHubConnectionArn:
     Type: String
     Description: "ARN of the CodeStar GitHub connection"
+  ExistingEcrRepoName:
+    Type: String
+    Default: "tax-service-api"
+    Description: "Name of the existing ECR repository to use"
 
 Resources:
+  # ECR Repository for Docker images
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ExistingEcrRepoName
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+
+  # CloudWatch Log Group for ECS logs
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
+      RetentionInDays: 30
+
   # S3 Bucket for CodePipeline artifacts test
   ArtifactsBucket:
     Type: AWS::S3::Bucket
@@ -206,6 +226,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 RoleArn: !GetAtt CloudFormationExecutionRole.Arn
                 Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName},ExistingLogGroupName=/ecs/${AppName}-${Environment}"
               InputArtifacts:
                 - Name: SourceArtifact
         - Name: Build
