@@ -199,6 +199,12 @@ Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
+ add-cfn-config
+      RetentionInDays: 30
+
+
+  # ALB
+
       Family: !Sub "${AppName}-${Environment}"
       RequiresCompatibilities: [FARGATE]
       Cpu: "256"
@@ -235,6 +241,7 @@ Resources:
   # ----------------------
   # ALB + SG
   # ----------------------
+ main
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
