@@ -151,9 +151,9 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
+                awslogs-group: !Ref AppLogGroup
+                awslogs-region: !Ref AWS::Region
+                awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
               - CMD-SHELL
@@ -189,10 +189,11 @@ Resources:
             Action: sts:AssumeRole
 
   # CloudWatch Logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      RetentionInDays: 30
+AppLogGroup:
+  Type: AWS::Logs::LogGroup
+  Properties:
+    RetentionInDays: 30
+
 
 
   # ALB
