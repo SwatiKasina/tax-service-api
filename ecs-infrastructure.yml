@@ -6,27 +6,17 @@ Parameters:
     Type: String
     Default: "prod"
     AllowedValues:
-<<<<<<< HEAD
-      - prod
-      - staging
-      - ExistingLogGroupName:
-          Type: String
-          Default: "/ecs/tax-service-api-prod"
-          Description: "Existing CloudWatch Log Group to use for ECS logs in prod"
-=======
       - "prod"
       - "staging"
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
 
   AppName:
     Type: String
     Default: "tax-service-api"
+
   ContainerPort:
     Type: Number
     Default: 8080
 
-<<<<<<< HEAD
-=======
   ExistingEcrRepoName:
     Type: String
     Default: "tax-service-api"
@@ -37,7 +27,6 @@ Parameters:
     Default: "/ecs/tax-service-api-prod"
     Description: "Existing CloudWatch Log Group to use for ECS logs (prod)"
 
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
 Resources:
   # ----------------------
   # VPC + IGW
@@ -90,11 +79,6 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-public-az2"
 
-<<<<<<< HEAD
-
-  # Route Table
-=======
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -136,71 +120,15 @@ Resources:
       AllocationId: !GetAtt NatEip.AllocationId
       SubnetId: !Ref PublicSubnet1
 
-<<<<<<< HEAD
-  NatEip:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  # ECR Repository
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Ref AppName
-      ImageScanningConfiguration:
-        ScanOnPush: true
-
-  # ECS Resources
-=======
   # ----------------------
   # ECS Cluster
   # ----------------------
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${AppName}-${Environment}-cluster"
 
-<<<<<<< HEAD
-  # Task Definition
-  TaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub "${AppName}-${Environment}-task"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: 512
-      Memory: 1024
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
-      ContainerDefinitions:
-        - Name: app
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.us-east-1.amazonaws.com/${AppName}:latest"
-          PortMappings:
-            - ContainerPort: !Ref ContainerPort
-              Protocol: tcp
-          Environment:
-            - Name: SPRING_PROFILES_ACTIVE
-              Value: !Ref Environment
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref ExistingLogGroupName
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-          HealthCheck:
-            Command:
-              - CMD-SHELL
-              - curl -f http://localhost:8080/actuator/health || exit 1
-            Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 60
-
-=======
   # ----------------------
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
   # IAM Roles
   # ----------------------
   TaskExecutionRole:
@@ -229,11 +157,6 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
-<<<<<<< HEAD
-
-
-  # ALB
-=======
   # ----------------------
   # Task Definition
   # ----------------------
@@ -272,7 +195,6 @@ Resources:
   # ----------------------
   # ALB + SG
   # ----------------------
->>>>>>> 9c31bab (Reuse existing CW log group in prod; remove AppLogGroup; tidy params)
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -417,11 +339,7 @@ Outputs:
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: !Sub "${AppName}-${Environment}-alb-url"
-  ECRRepository:
-    Description: ECR Repository URL
-    Value: !GetAtt ECRRepository.RepositoryUri
-    Export:
-      Name: !Sub "${AppName}-${Environment}-ecr-repo"
+
   ClusterName:
     Description: ECS Cluster Name
     Value: !Ref ECSCluster
