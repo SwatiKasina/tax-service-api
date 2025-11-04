@@ -1,34 +1,76 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "ECS Infrastructure for Tax Service API"
+Description: "ECS Fargate + ALB with optional ECR & LogGroup (use existing in prod)"
 
 Parameters:
   Environment:
     Type: String
-    Default: "prod"
-    AllowedValues:
-      - prod
-      - staging
+    AllowedValues: [prod, staging]
+    Default: prod
 
   AppName:
     Type: String
-    Default: "tax-service-api"
+    Default: tax-service-api
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.0.2.0/24
 
   ContainerPort:
+    Type: Number
+    Default: 8080
+
+  DesiredCount:
+    Type: Number
+    Default: 1
+
+  HealthPath:
     Type: String
-    Default: "8080"
+    Default: "/"
+
+  ImageTag:
+    Type: String
+    Default: latest
+
+  # ---- ECR toggle ----
+  CreateEcrRepo:
+    Type: String
+    AllowedValues: ['true','false']
+    Default: 'false'            # prod => false
 
   ExistingEcrRepoName:
     Type: String
-    Default: "tax-service-api"
-    Description: "Name of the existing ECR repository to use"
+    Default: tax-service-api     # already-existing repo
 
+  # ---- Log Group toggle ----
+  CreateLogGroup:
+    Type: String
+    AllowedValues: ['true','false']
+    Default: 'false'             # prod => false
+
+  ExistingLogGroupName:
+    Type: String
+    Default: /ecs/tax-service-api-prod  # set to your existing group name
+
+Conditions:
+  CreateEcrRepoCond:  !Equals [!Ref CreateEcrRepo,  'true']
+  CreateLogGroupCond: !Equals [!Ref CreateLogGroup, 'true']
 
 Resources:
-  # VPC
+  # ----------------------
+  # Networking
+  # ----------------------
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
+      CidrBlock: !Ref VpcCidr
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
@@ -48,37 +90,28 @@ Resources:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
 
-  # Subnets - 2 public, 2 private (ECS tasks need public for ECR pull, but ALB can use public)
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - 0
-        - !GetAZs
-          Ref: AWS::Region
-      CidrBlock: 10.0.1.0/24
+      CidrBlock: !Ref PublicSubnet1Cidr
       MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
       Tags:
         - Key: Name
-          Value: !Sub "${AppName}-${Environment}-public-az1"
+          Value: !Sub "${AppName}-${Environment}-pub-az1"
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select
-        - 1
-        - !GetAZs
-          Ref: AWS::Region
-      CidrBlock: 10.0.2.0/24
+      CidrBlock: !Ref PublicSubnet2Cidr
       MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
       Tags:
         - Key: Name
-          Value: !Sub "${AppName}-${Environment}-public-az2"
+          Value: !Sub "${AppName}-${Environment}-pub-az2"
 
-
-    # Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -94,256 +127,234 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  PublicSubnet1Association:
+  PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
 
-  PublicSubnet2Association:
+  PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
+      RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref PublicRouteTable
 
-  # NAT Gateway (for future private subnets)
-  NatGateway:
-    Type: AWS::EC2::NatGateway
+  # ----------------------
+  # ECR (optional)
+  # ----------------------
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Condition: CreateEcrRepoCond
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      AllocationId: !GetAtt NatEip.AllocationId
-      SubnetId: !Ref PublicSubnet1
+      RepositoryName: !Sub "${AppName}-${Environment}"
+      ImageScanningConfiguration: { ScanOnPush: true }
+      ImageTagMutability: IMMUTABLE
 
-  NatEip:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-
-
-  # ECS Resources
-  ECSCluster:
+  # ----------------------
+  # ECS + IAM + Logs
+  # ----------------------
+  Cluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${AppName}-${Environment}-cluster"
 
-  # Task Definition
-  TaskDefinition:
-    Type: AWS::ECS::TaskDefinition
+  # Log group (optional)
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: CreateLogGroupCond
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      Family: !Sub "${AppName}-${Environment}-task"
-      NetworkMode: awsvpc
-      RequiresCompatibilities:
-        - FARGATE
-      Cpu: 512
-      Memory: 1024
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
-      ContainerDefinitions:
-        - Name: app
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
+      RetentionInDays: 14
 
-          PortMappings:
-            - ContainerPort: !Ref ContainerPort
-              Protocol: tcp
-          Environment:
-            - Name: SPRING_PROFILES_ACTIVE
-              Value: !Ref Environment
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref LogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
-          HealthCheck:
-            Command:
-              - CMD-SHELL
-              - curl -f http://localhost:8080/actuator/health || exit 1
-            Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 60
-
-  # IAM Roles
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-execution-role"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      RoleName: !Sub "${AppName}-${Environment}-exec"
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
 
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-role"
+      RoleName: !Sub "${AppName}-${Environment}-task"
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
-  # CloudWatch Logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
     Properties:
+ add-cfn-config
       RetentionInDays: 30
 
 
   # ALB
+
+      Family: !Sub "${AppName}-${Environment}"
+      RequiresCompatibilities: [FARGATE]
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: !Ref AppName
+          Image: !Sub
+            - "${Account}.dkr.ecr.${Region}.amazonaws.com/${RepoName}:${ImageTag}"
+            - Account: !Ref "AWS::AccountId"
+              Region: !Ref "AWS::Region"
+              RepoName: !If
+                - CreateEcrRepoCond
+                - !Sub "${AppName}-${Environment}"
+                - !Ref ExistingEcrRepoName
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !If
+                - CreateLogGroupCond
+                - !Ref AppLogGroup
+                - !Ref ExistingLogGroupName
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: !Ref AppName
+          Environment:
+            - Name: ENV
+              Value: !Ref Environment
+
+  # ----------------------
+  # ALB + SG
+  # ----------------------
+ main
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for ALB
+      GroupDescription: !Sub "${AppName} ALB SG"
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-sg"
 
-  ApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Name: !Sub "${AppName}-${Environment}-alb"
-      Scheme: internet-facing
-      Type: application
-      Subnets:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
-      SecurityGroups:
-        - !Ref AlbSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-${Environment}-alb"
-
-  AlbTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub "${AppName}-${Environment}-tg"
-      Protocol: HTTP
-      Port: !Ref ContainerPort
-      VpcId: !Ref VPC
-      HealthCheckPath: /actuator/health
-      TargetType: ip
-      TargetGroupAttributes:
-        - Key: deregistration_delay.timeout_seconds
-          Value: "30"
-
-  AlbListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !GetAtt ApplicationLoadBalancer.LoadBalancerArn
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref AlbTargetGroup
-
-  # ECS Service
-  EcsServiceSecurityGroup:
+  ServiceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for ECS service
+      GroupDescription: !Sub "${AppName} Service SG"
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
           SourceSecurityGroupId: !Ref AlbSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub "${AppName}-${Environment}-service-sg"
+          Value: !Sub "${AppName}-${Environment}-svc-sg"
 
-  EcsService:
-    Type: AWS::ECS::Service
-    DependsOn: AlbListener
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      ServiceName: !Sub "${AppName}-${Environment}-service"
-      Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref TaskDefinition
-      DesiredCount: 1
+      Name: !Sub "${AppName}-${Environment}-alb"
+      Scheme: internet-facing
+      Subnets: [!Ref PublicSubnet1, !Ref PublicSubnet2]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-tg"
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: !Ref ContainerPort
+      TargetType: ip
+      HealthCheckPath: !Ref HealthPath
+      Matcher:
+        HttpCode: "200-399"
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: HttpListener
+    Properties:
+      ServiceName: !Sub "${AppName}-${Environment}-svc"
+      Cluster: !Ref Cluster
       LaunchType: FARGATE
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref TaskDefinition
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref EcsServiceSecurityGroup
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
+          SecurityGroups: [!Ref ServiceSecurityGroup]
+          Subnets: [!Ref PublicSubnet1, !Ref PublicSubnet2]
       LoadBalancers:
-        - ContainerName: app
+        - ContainerName: !Ref AppName
           ContainerPort: !Ref ContainerPort
-          TargetGroupArn: !Ref AlbTargetGroup
-
-  # Auto Scaling
-  ScalableTarget:
-    Type: AWS::ApplicationAutoScaling::ScalableTarget
-    Properties:
-      MinCapacity: 0
-      MaxCapacity: 3
-      ResourceId: !Sub "service/${AppName}-${Environment}-cluster/${AppName}-${Environment}-service"
-      ScalableDimension: ecs:service:DesiredCount
-      ServiceNamespace: ecs
-      RoleARN: !GetAtt AutoScalingRole.Arn
-
-  ScaleUpPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: !Sub "${AppName}-${Environment}-scale-up"
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70.0
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ECSServiceAverageCPUUtilization
-
-  ScaleDownPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: !Sub "${AppName}-${Environment}-scale-down"
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 30.0
-        ScaleInCooldown: 120
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ECSServiceAverageCPUUtilization
-
-  AutoScalingRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "${AppName}-${Environment}-autoscaling-role"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
-      AssumeRolePolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: application-autoscaling.amazonaws.com
-            Action: sts:AssumeRole
+          TargetGroupArn: !Ref TargetGroup
 
 Outputs:
-  AlbUrl:
-    Description: URL of the Application Load Balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-    Export:
-      Name: !Sub "${AppName}-${Environment}-alb-url"
+  AlbDNSName:
+    Description: "Public URL"
+    Value: !GetAtt LoadBalancer.DNSName
 
   ClusterName:
-    Description: ECS Cluster Name
-    Value: !Ref ECSCluster
-    Export:
-      Name: !Sub "${AppName}-${Environment}-cluster-name"
+    Description: "ECS Cluster"
+    Value: !Ref Cluster
+
+  RepositoryToUse:
+    Description: "ECR repository name used by the task/image"
+    Value: !If
+      - CreateEcrRepoCond
+      - !Sub "${AppName}-${Environment}"
+      - !Ref ExistingEcrRepoName
+
+  RepositoryUri:
+    Description: "ECR URI to push/pull"
+    Value: !Sub
+      - "${Account}.dkr.ecr.${Region}.amazonaws.com/${RepoName}"
+      - Account: !Ref "AWS::AccountId"
+        Region: !Ref "AWS::Region"
+        RepoName: !If
+          - CreateEcrRepoCond
+          - !Sub "${AppName}-${Environment}"
+          - !Ref ExistingEcrRepoName
+
+  LogGroupUsed:
+    Description: "CloudWatch Logs group used by the task"
+    Value: !If
+      - CreateLogGroupCond
+      - !Ref AppLogGroup
+      - !Ref ExistingLogGroupName

@@ -1,35 +1,41 @@
+
 version: 0.2
 
 env:
   variables:
+    ECR_REPOSITORY: "tax-service-api"
     IMAGE_TAG: "latest"
-    ECR_REPO_NAME: "tax-service-api"
-    AWS_REGION: "us-east-1"
+
 phases:
   pre_build:
     commands:
-      - echo Logging in to Amazon ECR...
+      - echo "Logging in to Amazon ECR..."
       - aws --version
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - export REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tax-service-api
-      - echo $REPOSITORY_URI
-      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+      - REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+      - REPOSITORY_URI="${REGISTRY}/${ECR_REPOSITORY}"
+      - echo "REGISTRY = ${REGISTRY}"
+      - echo "REPO URI = ${REPOSITORY_URI}"
+      - aws ecr get-login-password --region "${REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
 
   build:
     commands:
-      - echo Build started on $(date)
+      - echo "Build started on $(date)"
       - mvn clean package -DskipTests
-      - docker build -t tax-service-api .
-      - docker tag tax-service-api:latest $REPOSITORY_URI:$IMAGE_TAG
-      - docker tag tax-service-api:latest $REPOSITORY_URI:$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - docker build -t "${ECR_REPOSITORY}:latest" .
+      - docker tag "${ECR_REPOSITORY}:latest" "${REPOSITORY_URI}:${IMAGE_TAG}"
+      - SHORT_SHA=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - docker tag "${ECR_REPOSITORY}:latest" "${REPOSITORY_URI}:${SHORT_SHA}"
 
   post_build:
     commands:
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - docker push $REPOSITORY_URI:$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - printf '{"ImageURI":"%s:%s"}' $REPOSITORY_URI $IMAGE_TAG > imageDetail.json
+      - docker push "${REPOSITORY_URI}:${IMAGE_TAG}"
+      - docker push "${REPOSITORY_URI}:${SHORT_SHA}"
+      - CONTAINER_NAME="app"   # must match your ECS task definition
+      - printf '[{"name":"%s","imageUri":"%s:%s"}]' "$CONTAINER_NAME" "$REPOSITORY_URI" "$IMAGE_TAG" > imagedefinitions.json
 
 artifacts:
   files:
-    - imageDetail.json
+    - imagedefinitions.json
     - ecs-infrastructure.yml
