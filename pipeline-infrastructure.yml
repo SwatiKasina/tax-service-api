@@ -37,8 +37,26 @@ Resources:
       ImageScanningConfiguration:
         ScanOnPush: true
       ImageTagMutability: MUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
 
-  # S3 Bucket for CodePipeline artifacts test
+  # S3 Bucket for CodePipeline artifacts
   ArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -50,20 +68,22 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
 
   # IAM Role for CodePipeline
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-codepipeline-role"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess
       Policies:
         - PolicyName: CodeStarConnectionAccess
           PolicyDocument:
@@ -72,10 +92,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - codestar-connections:UseConnection
-                  - codestar-connections:GetConnection
-                  - codestar-connections:ListConnections
-                  - codestar-connections:PassConnection
-                Resource: "*"
+                Resource: !Ref GitHubConnectionArn
         - PolicyName: S3ArtifactsAccess
           PolicyDocument:
             Version: "2012-10-17"
@@ -99,7 +116,6 @@ Resources:
                   - codebuild:StartBuild
                   - codebuild:StopBuild
                   - codebuild:BatchGetBuilds
-                  - codebuild:BatchGetBuildBatches
                 Resource: !GetAtt CodeBuildProject.Arn
         - PolicyName: CloudFormationAccess
           PolicyDocument:
@@ -114,21 +130,34 @@ Resources:
                   - cloudformation:CreateChangeSet
                   - cloudformation:ExecuteChangeSet
                   - cloudformation:DescribeChangeSet
+                  - cloudformation:DeleteChangeSet
                   - cloudformation:GetTemplate
-                Resource: !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/${AppName}-${Environment}-infrastructure/*"
-        - PolicyName: IAMPassRole
+                Resource: "*"
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+        - PolicyName: ECSDeployAccess
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: iam:PassRole
-                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:DescribeTaskDefinition
+                  - ecs:DescribeTasks
+                  - ecs:ListTasks
+                  - ecs:RegisterTaskDefinition
+                  - ecs:UpdateService
+                  - iam:PassRole
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codepipeline-role"
 
   # IAM Role for CloudFormation Execution
   CloudFormationExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-cloudformation-role"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -137,25 +166,61 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-cloudformation-role"
 
   # IAM Role for CodeBuild
   CodeBuildServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-codebuild-role"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
             Principal:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
-        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
-        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
-        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+      Policies:
+        - PolicyName: CodeBuildBasePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AppName}-${Environment}-build"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${AppName}-${Environment}-build:*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${ArtifactsBucket}/*"
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource: "*"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codebuild-role"
+
+  # CloudWatch Log Group for CodeBuild
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/codebuild/${AppName}-${Environment}-build"
+      RetentionInDays: 7
 
   # CodeBuild Project
   CodeBuildProject:
@@ -171,13 +236,21 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
         PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref ExistingEcrRepoName
+          - Name: IMAGE_TAG
+            Value: latest
       Source:
         Type: CODEPIPELINE
         BuildSpec: buildspec.yml
       LogsConfig:
         CloudWatchLogs:
-          GroupName: !Sub "/aws/codebuild/${AppName}-${Environment}-build"
-          StreamName: build
+          GroupName: !Ref CodeBuildLogGroup
           Status: ENABLED
 
   # CodePipeline
@@ -202,9 +275,10 @@ Resources:
                 ConnectionArn: !Ref GitHubConnectionArn
                 FullRepositoryId: !Sub "${GitHubOwner}/${GitHubRepo}"
                 BranchName: !Ref GitHubBranch
-                DetectChanges: "true"
+                DetectChanges: true
               OutputArtifacts:
                 - Name: SourceArtifact
+
         - Name: Deploy_Infrastructure
           Actions:
             - Name: Deploy_CloudFormation
@@ -215,13 +289,19 @@ Resources:
                 Version: "1"
               Configuration:
                 StackName: !Sub "${AppName}-${Environment}-infrastructure"
-                TemplatePath: "SourceArtifact::ecs-infrastructure.yml"
                 ActionMode: CREATE_UPDATE
                 RoleArn: !GetAtt CloudFormationExecutionRole.Arn
-                Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName}"
+                TemplatePath: SourceArtifact::ecs-infrastructure.yml
+                Capabilities: CAPABILITY_NAMED_IAM
+                ParameterOverrides: !Sub |
+                  {
+                    "Environment": "${Environment}",
+                    "AppName": "${AppName}",
+                    "ExistingEcrRepoName": "${ExistingEcrRepoName}"
+                  }
               InputArtifacts:
                 - Name: SourceArtifact
+
         - Name: Build
           Actions:
             - Name: Docker_Build
@@ -236,6 +316,7 @@ Resources:
                 - Name: SourceArtifact
               OutputArtifacts:
                 - Name: BuildArtifact
+
         - Name: Deploy_Service
           Actions:
             - Name: Deploy_ECS
@@ -247,7 +328,7 @@ Resources:
               Configuration:
                 ClusterName: !Sub "${AppName}-${Environment}-cluster"
                 ServiceName: !Sub "${AppName}-${Environment}-service"
-                FileName: "BuildArtifact::imageDetail.json"
+                FileName: imagedefinitions.json
               InputArtifacts:
                 - Name: BuildArtifact
 
@@ -255,15 +336,23 @@ Outputs:
   PipelineName:
     Description: CodePipeline name
     Value: !Ref CodePipeline
+    Export:
+      Name: !Sub "${AppName}-${Environment}-pipeline-name"
+
   CodeBuildProjectName:
     Description: CodeBuild project name
     Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub "${AppName}-${Environment}-codebuild-name"
+
   ArtifactsBucketName:
     Description: S3 bucket for artifacts
     Value: !Ref ArtifactsBucket
-  PipelineRoleArn:
-    Description: CodePipeline service role ARN
-    Value: !GetAtt CodePipelineServiceRole.Arn
-  CodeBuildRoleArn:
-    Description: CodeBuild service role ARN
-    Value: !GetAtt CodeBuildServiceRole.Arn
+    Export:
+      Name: !Sub "${AppName}-${Environment}-artifacts-bucket"
+
+  EcrRepositoryUri:
+    Description: ECR Repository URI
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}"
+    Export:
+      Name: !Sub "${AppName}-${Environment}-ecr-uri"

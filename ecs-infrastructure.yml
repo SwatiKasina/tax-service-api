@@ -22,11 +22,6 @@ Parameters:
     Default: "tax-service-api"
     Description: "Name of the existing ECR repository to use"
 
-  LogGroupName:
-    Type: String
-    Default: "/ecs/tax-service-api"
-    Description: "CloudWatch Log Group name for ECS logs"
-
 Resources:
   # ----------------------
   # Networking (VPC + IGW)
@@ -61,7 +56,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs { Ref: AWS::Region }]
+      AvailabilityZone: !Select [0, !GetAZs ""]
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -72,7 +67,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs { Ref: AWS::Region }]
+      AvailabilityZone: !Select [1, !GetAZs ""]
       CidrBlock: 10.0.2.0/24
       MapPublicIpOnLaunch: true
       Tags:
@@ -107,31 +102,17 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # ----------------------
-  # NAT (optional / future)
-  # ----------------------
-  NatEip:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatEip.AllocationId
-      SubnetId: !Ref PublicSubnet1
-
-  # ----------------------
   # CloudWatch Log Group
   # ----------------------
   AppLogGroup:
     Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
       RetentionInDays: 14
-    DeletionPolicy: Retain
 
-
-    # ----------------------
+  # ----------------------
   # ECS Cluster
   # ----------------------
   ECSCluster:
@@ -145,7 +126,6 @@ Resources:
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-execution-role"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       AssumeRolePolicyDocument:
@@ -155,11 +135,13 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-task-execution-role"
 
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-task-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -167,6 +149,9 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-task-role"
 
   # ----------------------
   # ECS Task Definition
@@ -177,8 +162,8 @@ Resources:
       Family: !Sub "${AppName}-${Environment}-task"
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
-      Cpu: 512
-      Memory: 1024
+      Cpu: "512"
+      Memory: "1024"
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
@@ -190,19 +175,16 @@ Resources:
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
               Value: !Ref Environment
-      LogConfiguration:
-          LogDriver: awslogs
-          Options:
-            awslogs-group: !Sub "/ecs/${AppName}-${Environment}"
-            awslogs-region: !Ref AWS::Region
-            awslogs-stream-prefix: ecs
-
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/ecs/${AppName}-${Environment}"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
-              [
-                "CMD-SHELL",
-                "curl -f http://localhost:8080/actuator/health || exit 1",
-              ]
+              - CMD-SHELL
+              - curl -f http://localhost:8080/actuator/health || exit 1
             Interval: 30
             Timeout: 5
             Retries: 3
@@ -231,8 +213,11 @@ Resources:
       Name: !Sub "${AppName}-${Environment}-alb"
       Scheme: internet-facing
       Type: application
-      Subnets: [!Ref PublicSubnet1, !Ref PublicSubnet2]
-      SecurityGroups: [!Ref AlbSecurityGroup]
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
 
   AlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -242,6 +227,10 @@ Resources:
       Port: !Ref ContainerPort
       VpcId: !Ref VPC
       HealthCheckPath: /actuator/health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
       TargetType: ip
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
@@ -250,7 +239,7 @@ Resources:
   AlbListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      LoadBalancerArn: !GetAtt ApplicationLoadBalancer.LoadBalancerArn
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
       DefaultActions:
@@ -285,11 +274,20 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
-          SecurityGroups: [!Ref EcsServiceSecurityGroup]
-          Subnets: [!Ref PublicSubnet1, !Ref PublicSubnet2]
+          SecurityGroups:
+            - !Ref EcsServiceSecurityGroup
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
       LoadBalancers:
         - ContainerName: app
           ContainerPort: !Ref ContainerPort
@@ -301,7 +299,6 @@ Resources:
   AutoScalingRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-${Environment}-autoscaling-role"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
       AssumeRolePolicyDocument:
@@ -311,13 +308,16 @@ Resources:
             Principal:
               Service: application-autoscaling.amazonaws.com
             Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-autoscaling-role"
 
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     DependsOn: EcsService
     Properties:
       ServiceNamespace: ecs
-      ResourceId: !Sub "service/${AppName}-${Environment}-cluster/${AppName}-${Environment}-service"
+      ResourceId: !Sub "service/${ECSCluster}/${AppName}-${Environment}-service"
       ScalableDimension: ecs:service:DesiredCount
       MinCapacity: 1
       MaxCapacity: 3
@@ -325,14 +325,13 @@ Resources:
 
   ScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    DependsOn: ScalableTarget
     Properties:
       PolicyName: !Sub "${AppName}-${Environment}-scale-policy"
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ScalableTarget
       TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 30.0
-        ScaleInCooldown: 120
+        TargetValue: 70.0
+        ScaleInCooldown: 300
         ScaleOutCooldown: 60
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
@@ -349,3 +348,13 @@ Outputs:
     Value: !Ref ECSCluster
     Export:
       Name: !Sub "${AppName}-${Environment}-cluster-name"
+
+  ServiceName:
+    Description: ECS Service Name
+    Value: !GetAtt EcsService.Name
+    Export:
+      Name: !Sub "${AppName}-${Environment}-service-name"
+
+  TaskDefinitionArn:
+    Description: Task Definition ARN
+    Value: !Ref TaskDefinition
