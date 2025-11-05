@@ -17,7 +17,11 @@ ScalableTarget:
   DependsOn: EcsService
   Properties:
     ServiceNamespace: ecs
+<<<<<<< HEAD
     ResourceId: !Sub "service/${AppName}-${Environment}-cluster/${AppName}-${Environment}-service"
+=======
+    ResourceId: !Sub service/${ECSCluster}/${EcsService}
+>>>>>>> ecs/reuse-existing-loggroup
     ScalableDimension: ecs:service:DesiredCount
     MinCapacity: 1
     MaxCapacity: 3
