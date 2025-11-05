@@ -219,7 +219,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 RoleArn: !GetAtt CloudFormationExecutionRole.Arn
                 Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName},LogGroupName=/ecs/tax-service-api"
+                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName}"
               InputArtifacts:
                 - Name: SourceArtifact
         - Name: Build
