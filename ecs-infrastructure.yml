@@ -299,29 +299,20 @@ Resources:
 
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: EcsService
     Properties:
-      MinCapacity: 0
-      MaxCapacity: 3
-      ResourceId: !Sub "service/${AppName}-${Environment}-cluster/${AppName}-${Environment}-service"
-      ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
-      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/${EcsCluster}/${EcsService}
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 1
+      MaxCapacity: 3
+      RoleARN: !GetAtt ApplicationAutoScalingRole.Arn
 
-  ScaleUpPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: !Sub "${AppName}-${Environment}-scale-up"
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70.0
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ECSServiceAverageCPUUtilization
 
-  ScaleDownPolicy:
+
+  ScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: ScalableTarget
     Properties:
       PolicyName: !Sub "${AppName}-${Environment}-scale-down"
       PolicyType: TargetTrackingScaling
