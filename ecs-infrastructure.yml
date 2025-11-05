@@ -121,6 +121,15 @@ Resources:
       SubnetId: !Ref PublicSubnet1
 
   # ----------------------
+  # CloudWatch Log Group
+  # ----------------------
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Ref ExistingLogGroupName
+      RetentionInDays: 30
+
+  # ----------------------
   # ECS Cluster
   # ----------------------
   ECSCluster:
