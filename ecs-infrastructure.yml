@@ -126,7 +126,7 @@ Resources:
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "${LogGroupName}-${Environment}"
+      LogGroupName: !Ref LogGroupName
       RetentionInDays: 14
     DeletionPolicy: Retain
 
@@ -192,7 +192,7 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Sub "${LogGroupName}-${Environment}"
+              awslogs-group: !Ref LogGroupName
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           HealthCheck:
