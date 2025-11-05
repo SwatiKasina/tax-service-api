@@ -29,7 +29,7 @@ Parameters:
 
 Resources:
   # ----------------------
-  # VPC + IGW
+  # Networking (VPC + IGW)
   # ----------------------
   VPC:
     Type: AWS::EC2::VPC
@@ -55,7 +55,7 @@ Resources:
       VpcId: !Ref VPC
 
   # ----------------------
-  # Public Subnets + Route
+  # Public Subnets + Routes
   # ----------------------
   PublicSubnet1:
     Type: AWS::EC2::Subnet
@@ -123,11 +123,12 @@ Resources:
   # ----------------------
   # CloudWatch Log Group
   # ----------------------
-  LogGroup:
+  AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Ref ExistingLogGroupName
-      RetentionInDays: 30
+      RetentionInDays: 14
+    DeletionPolicy: Retain
 
   # ----------------------
   # ECS Cluster
@@ -167,7 +168,7 @@ Resources:
             Action: sts:AssumeRole
 
   # ----------------------
-  # Task Definition
+  # ECS Task Definition
   # ----------------------
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -196,17 +197,14 @@ Resources:
               awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
-              [
-                "CMD-SHELL",
-                "curl -f http://localhost:8080/actuator/health || exit 1",
-              ]
+              ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
             Interval: 30
             Timeout: 5
             Retries: 3
             StartPeriod: 60
 
   # ----------------------
-  # ALB + SG
+  # ALB + Security Groups
   # ----------------------
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -230,9 +228,6 @@ Resources:
       Type: application
       Subnets: [!Ref PublicSubnet1, !Ref PublicSubnet2]
       SecurityGroups: [!Ref AlbSecurityGroup]
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-${Environment}-alb"
 
   AlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -276,7 +271,9 @@ Resources:
 
   EcsService:
     Type: AWS::ECS::Service
-    DependsOn: AlbListener
+    DependsOn:
+      - AlbListener
+      - AppLogGroup
     Properties:
       ServiceName: !Sub "${AppName}-${Environment}-service"
       Cluster: !Ref ECSCluster
