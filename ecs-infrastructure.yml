@@ -126,9 +126,10 @@ Resources:
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
+      LogGroupName: "/ecs/tax-service-api-prod"
       RetentionInDays: 14
     DeletionPolicy: Retain
+
 
 
     # ----------------------
