@@ -22,10 +22,10 @@ Parameters:
     Default: "tax-service-api"
     Description: "Name of the existing ECR repository to use"
 
-  ExistingLogGroupName:
+  LogGroupName:
     Type: String
-    Default: "/ecs/tax-service-api-prod"
-    Description: "Existing CloudWatch Log Group to use for ECS logs (prod)"
+    Default: "/ecs/tax-service-api"
+    Description: "CloudWatch Log Group name for ECS logs"
 
 Resources:
   # ----------------------
@@ -126,7 +126,7 @@ Resources:
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Ref ExistingLogGroupName
+      LogGroupName: !Sub "${LogGroupName}-${Environment}"
       RetentionInDays: 14
     DeletionPolicy: Retain
 
@@ -192,12 +192,15 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref ExistingLogGroupName
+              awslogs-group: !Sub "${LogGroupName}-${Environment}"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           HealthCheck:
             Command:
-              ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+              [
+                "CMD-SHELL",
+                "curl -f http://localhost:8080/actuator/health || exit 1",
+              ]
             Interval: 30
             Timeout: 5
             Retries: 3
