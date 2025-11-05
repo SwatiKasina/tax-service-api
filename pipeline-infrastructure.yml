@@ -38,13 +38,6 @@ Resources:
         ScanOnPush: true
       ImageTagMutability: MUTABLE
 
-  # CloudWatch Log Group for ECS logs
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
-      RetentionInDays: 30
-
   # S3 Bucket for CodePipeline artifacts test
   ArtifactsBucket:
     Type: AWS::S3::Bucket
@@ -226,7 +219,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 RoleArn: !GetAtt CloudFormationExecutionRole.Arn
                 Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
-                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName},ExistingLogGroupName=/ecs/${AppName}-${Environment}"
+                Parameters: !Sub "Environment=${Environment},AppName=${AppName},ExistingEcrRepoName=${ExistingEcrRepoName},LogGroupName=/ecs/tax-service-api"
               InputArtifacts:
                 - Name: SourceArtifact
         - Name: Build
