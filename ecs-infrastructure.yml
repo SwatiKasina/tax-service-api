@@ -126,11 +126,12 @@ Resources:
   AppLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Ref LogGroupName
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
       RetentionInDays: 14
     DeletionPolicy: Retain
 
-  # ----------------------
+
+    # ----------------------
   # ECS Cluster
   # ----------------------
   ECSCluster:
@@ -189,12 +190,13 @@ Resources:
           Environment:
             - Name: SPRING_PROFILES_ACTIVE
               Value: !Ref Environment
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref LogGroupName
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: ecs
+      LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Sub "/ecs/${AppName}-${Environment}"
+            awslogs-region: !Ref AWS::Region
+            awslogs-stream-prefix: ecs
+
           HealthCheck:
             Command:
               [
