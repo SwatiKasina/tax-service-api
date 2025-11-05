@@ -17,7 +17,7 @@ ScalableTarget:
   DependsOn: EcsService
   Properties:
     ServiceNamespace: ecs
-    ResourceId: !Sub service/${ECSCluster}/${EcsService}
+    ResourceId: !Sub "service/${AppName}-${Environment}-cluster/${AppName}-${Environment}-service"
     ScalableDimension: ecs:service:DesiredCount
     MinCapacity: 1
     MaxCapacity: 3
