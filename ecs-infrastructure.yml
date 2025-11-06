@@ -109,14 +109,13 @@ Resources:
   # ----------------------
   # CloudWatch Log Group
   # ----------------------
-AppLogGroup:
-  Type: AWS::Logs::LogGroup
-  UpdateReplacePolicy: Retain
-  DeletionPolicy: Retain
-  Properties:
-    LogGroupName: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
-    RetentionInDays: 14
-
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
+      RetentionInDays: 14
 
   # ----------------------
   # IAM Roles
@@ -176,7 +175,7 @@ AppLogGroup:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Sub "/ecs/${AppName}-${Environment}"
+              awslogs-group: !Ref AppLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           HealthCheck:
