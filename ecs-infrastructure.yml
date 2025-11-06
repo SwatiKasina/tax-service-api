@@ -27,6 +27,13 @@ Parameters:
     Default: "tax-service-api-prod-cluster"
     Description: "Name of the existing ECS cluster"
 
+# ----------------------
+# Conditions
+# ----------------------
+Conditions:
+  # Skip creating the log group in prod (avoid AlreadyExists error)
+  CreateLogGroupCond: !Equals [!Ref Environment, "staging"]
+
 Resources:
   # ----------------------
   # Networking (VPC + IGW)
@@ -107,10 +114,11 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
 
   # ----------------------
-  # CloudWatch Log Group
+  # CloudWatch Log Group (Condition added ✅)
   # ----------------------
   AppLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: CreateLogGroupCond
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
@@ -175,7 +183,7 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref AppLogGroup
+              awslogs-group: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
           HealthCheck:
@@ -264,7 +272,6 @@ Resources:
     Type: AWS::ECS::Service
     DependsOn:
       - AlbListener
-      - AppLogGroup
     Properties:
       ServiceName: !Sub "${AppName}-${Environment}-service"
       Cluster: !Ref ECSClusterName
@@ -333,6 +340,9 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
 
+# ----------------------
+# Outputs
+# ----------------------
 Outputs:
   AlbUrl:
     Description: URL of the Application Load Balancer
@@ -355,3 +365,4 @@ Outputs:
   TaskDefinitionArn:
     Description: Task Definition ARN
     Value: !Ref TaskDefinition
+
