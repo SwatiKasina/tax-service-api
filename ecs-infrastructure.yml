@@ -114,7 +114,8 @@ Resources:
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
     Properties:
-      LogGroupName: !Sub "/ecs/${AppName}-${Environment}"
+     LogGroupName: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
+
       RetentionInDays: 14
 
   # ----------------------
