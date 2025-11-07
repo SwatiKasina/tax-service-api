@@ -133,13 +133,24 @@ Resources:
             StartPeriod: 60
 
   # ----------------------
+  # ECS Cluster
+  # ----------------------
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ECSClusterName
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-cluster"
+
+  # ----------------------
   # ECS Service
   # ----------------------
   EcsService:
     Type: AWS::ECS::Service
     Properties:
       ServiceName: !Sub "${AppName}-${Environment}-service"
-      Cluster: !Ref ECSClusterName
+      Cluster: !Ref EcsCluster
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !Ref DesiredCount
       LaunchType: FARGATE
