@@ -109,17 +109,17 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: !Sub "${AppName}-${Environment} ECS service SG"
-      VpcId:
-        Fn::If:
-          - UseExisting
-          - !Ref ExistingVpcId
-          - Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+      VpcId: !If
+        - UseExisting
+        - !Ref ExistingVpcId
+        - !ImportValue
+          "Fn::Sub": "${AppName}-${Environment}-VpcId"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
-          SourceSecurityGroupId:
-            Fn::ImportValue: !Sub "${AppName}-${Environment}-AlbSecurityGroupId"
+          SourceSecurityGroupId: !ImportValue
+            "Fn::Sub": "${AppName}-${Environment}-AlbSecurityGroupId"
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-service-sg"
@@ -195,14 +195,16 @@ Resources:
           SecurityGroups:
             - !Ref EcsServiceSecurityGroup
           Subnets:
-            - Fn::If
+            - !If
               - UseExisting
               - !Ref ExistingPublicSubnet1Id
-              - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet1Id"
-            - Fn::If
+              - !ImportValue
+                "Fn::Sub": "${AppName}-${Environment}-PublicSubnet1Id"
+            - !If
               - UseExisting
               - !Ref ExistingPublicSubnet2Id
-              - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet2Id"
+              - !ImportValue
+                "Fn::Sub": "${AppName}-${Environment}-PublicSubnet2Id"
       LoadBalancers:
         - ContainerName: app
           ContainerPort: !Ref ContainerPort
