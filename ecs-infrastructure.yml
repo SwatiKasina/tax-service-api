@@ -169,8 +169,8 @@ Resources:
       RequiresCompatibilities: [FARGATE]
       Cpu: "512"
       Memory: "1024"
-      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
-      TaskRoleArn: !GetAtt TaskRole.Arn
+      ExecutionRoleArn: arn:aws:iam::166538851957:role/tax-service-api-prod-task-execution-role
+      TaskRoleArn: arn:aws:iam::166538851957:role/tax-service-api-prod-task-execution-role
       ContainerDefinitions:
         - Name: app
           Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
@@ -194,6 +194,7 @@ Resources:
             Timeout: 5
             Retries: 3
             StartPeriod: 60
+
 
   # ----------------------
   # ALB + Security Groups
