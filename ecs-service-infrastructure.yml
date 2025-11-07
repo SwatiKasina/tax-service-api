@@ -133,8 +133,8 @@ Resources:
       Family: !Sub "${AppName}-${Environment}-task"
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
-      Cpu: "512"
-      Memory: "1024"
+      Cpu: "1024"
+      Memory: "2048"
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
