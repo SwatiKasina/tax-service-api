@@ -350,7 +350,7 @@ Resources:
                     "AppName": "${AppName}",
                     "ExistingEcrRepoName": "${ExistingEcrRepoName}",
                     "ECSClusterName": "${ECSClusterName}",
-                    "DesiredCount": "0"
+                    "DesiredCount": "1"
                   }
               InputArtifacts:
                 - Name: SourceArtifact
