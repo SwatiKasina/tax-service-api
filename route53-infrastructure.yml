@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Route 53 DNS record(s) for Tax Service API - alias api.<zone> to ALB"
+
+Parameters:
+  AppName:
+    Type: String
+    Default: "tax-service-api"
+  Environment:
+    Type: String
+    Default: "prod"
+    AllowedValues:
+      - "prod"
+      - "staging"
+  HostedZoneName:
+    Type: String
+    Description: "Public hosted zone name (with trailing dot). Example: tkpshivatemple.com."
+    Default: "tkpshivatemple.com."
+  RecordName:
+    Type: String
+    Description: "Record name without the zone. Example: api"
+    Default: "api"
+
+  DnsRecordMode:
+    Type: String
+    Default: "ALIAS"
+    AllowedValues:
+      - "ALIAS"
+      - "CNAME"
+    Description: "Choose ALIAS (A alias to ALB) or CNAME (to ALB DNS). ALIAS is recommended."
+
+Mappings:
+  AWSRegionToALBHostedZoneId:
+    us-east-1:
+      HostedZoneId: "Z35SXDOTRQ7X7K"
+
+Conditions:
+  IsAlias: !Equals [!Ref DnsRecordMode, "ALIAS"]
+  IsCname: !Equals [!Ref DnsRecordMode, "CNAME"]
+
+Resources:
+  ApiAliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: IsAlias
+    Properties:
+      HostedZoneName: !Ref HostedZoneName
+      Name: !Sub "${RecordName}.${HostedZoneName}"
+      Type: A
+      AliasTarget:
+        DNSName:
+          Fn::ImportValue: !Sub "${AppName}-${Environment}-AlbDNS"
+        HostedZoneId:
+          !FindInMap [
+            AWSRegionToALBHostedZoneId,
+            !Ref "AWS::Region",
+            HostedZoneId,
+          ]
+        EvaluateTargetHealth: true
+
+  ApiCnameRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: IsCname
+    Properties:
+      HostedZoneName: !Ref HostedZoneName
+      Name: !Sub "${RecordName}.${HostedZoneName}"
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - Fn::ImportValue: !Sub "${AppName}-${Environment}-AlbDNS"
+
+Outputs:
+  ApiRecordFqdn:
+    Description: "Fully qualified API record name"
+    Value: !If [IsAlias, !Ref ApiAliasRecord, !Ref ApiCnameRecord]
