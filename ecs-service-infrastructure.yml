@@ -159,7 +159,7 @@ Resources:
             Interval: 30
             Timeout: 5
             Retries: 3
-            StartPeriod: 60
+            StartPeriod: 180
 
   # ----------------------
   # ECS Cluster
@@ -184,11 +184,12 @@ Resources:
       DesiredCount: !Ref DesiredCount
       LaunchType: FARGATE
       DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
+      HealthCheckGracePeriodSeconds: 180
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED

@@ -330,6 +330,22 @@ Resources:
               InputArtifacts:
                 - Name: SourceArtifact
 
+        # Move Build BEFORE ECS Service creation so image exists when service launches
+        - Name: Build
+          Actions:
+            - Name: Docker_Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: "1"
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+
         - Name: Deploy_ECSInfra
           Actions:
             - Name: Deploy_ECS_Service_Infra
@@ -354,21 +370,6 @@ Resources:
                   }
               InputArtifacts:
                 - Name: SourceArtifact
-
-        - Name: Build
-          Actions:
-            - Name: Docker_Build
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: "1"
-              Configuration:
-                ProjectName: !Ref CodeBuildProject
-              InputArtifacts:
-                - Name: SourceArtifact
-              OutputArtifacts:
-                - Name: BuildArtifact
 
         - Name: Deploy_Service
           Actions:
