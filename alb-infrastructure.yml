@@ -15,9 +15,28 @@ Parameters:
     Type: Number
     Default: "8080"
 
+  # Optional: deploy into an existing VPC/Subnets (e.g., where RDS resides)
+  UseExistingNetwork:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: "Set to true to use ExistingVpcId and ExistingPublicSubnet* parameters instead of network stack exports"
+  ExistingVpcId:
+    Type: String
+    Default: ""
+  ExistingPublicSubnet1Id:
+    Type: String
+    Default: ""
+  ExistingPublicSubnet2Id:
+    Type: String
+    Default: ""
+
   AcmCertificateArn:
     Type: String
     Description: "ARN of existing ACM certificate for HTTPS listener (e.g., arn:aws:acm:region:account:certificate/uuid)"
+
+Conditions:
+  UseExisting: !Equals [!Ref UseExistingNetwork, "true"]
 
 Resources:
   AlbSecurityGroup:
@@ -25,7 +44,10 @@ Resources:
     Properties:
       GroupDescription: !Sub "${AppName}-${Environment} ALB SG"
       VpcId:
-        Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+        Fn::If:
+          - UseExisting
+          - !Ref ExistingVpcId
+          - Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -46,8 +68,14 @@ Resources:
       Scheme: internet-facing
       Type: application
       Subnets:
-        - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet1Id"
-        - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet2Id"
+        - Fn::If
+          - UseExisting
+          - !Ref ExistingPublicSubnet1Id
+          - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet1Id"
+        - Fn::If
+          - UseExisting
+          - !Ref ExistingPublicSubnet2Id
+          - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet2Id"
       SecurityGroups:
         - !Ref AlbSecurityGroup
 
@@ -58,7 +86,10 @@ Resources:
       Protocol: HTTP
       Port: !Ref ContainerPort
       VpcId:
-        Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+        Fn::If:
+          - UseExisting
+          - !Ref ExistingVpcId
+          - Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
       HealthCheckPath: /actuator/health/liveness
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
