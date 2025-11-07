@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ECS Service stack: Task Definition, Service, SG, Logs, AutoScaling for Tax Service API"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: "prod"
+    AllowedValues:
+      - "prod"
+      - "staging"
+
+  AppName:
+    Type: String
+    Default: "tax-service-api"
+
+  ContainerPort:
+    Type: Number
+    Default: 8080
+
+  ExistingEcrRepoName:
+    Type: String
+    Default: "tax-service-api"
+    Description: "Name of the existing ECR repository to use"
+
+  ECSClusterName:
+    Type: String
+    Default: !Sub "${AppName}-${Environment}-cluster"
+    Description: "Name of the existing ECS cluster"
+
+  DesiredCount:
+    Type: Number
+    Default: 0
+    Description: "Desired task count for ECS service. Use 0 until image is available."
+
+Resources:
+  # ----------------------
+  # CloudWatch Log Group
+  # ----------------------
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
+      RetentionInDays: 14
+
+  # ----------------------
+  # IAM Roles
+  # ----------------------
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-task-execution-role"
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-task-role"
+
+  # ----------------------
+  # Security Groups
+  # ----------------------
+  EcsServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AppName}-${Environment} ECS service SG"
+      VpcId:
+        Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${AppName}-${Environment}-AlbSecurityGroupId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-service-sg"
+
+  # ----------------------
+  # Task Definition
+  # ----------------------
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AppName}-${Environment}-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Cpu: "512"
+      Memory: "1024"
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ExistingEcrRepoName}:latest"
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+              Protocol: tcp
+          Environment:
+            - Name: SPRING_PROFILES_ACTIVE
+              Value: !Ref Environment
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "/ecs/${AppName}-${Environment}-${AWS::StackName}"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:8080/actuator/health/liveness || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+
+  # ----------------------
+  # ECS Service
+  # ----------------------
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AppName}-${Environment}-service"
+      Cluster: !Ref ECSClusterName
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref EcsServiceSecurityGroup
+          Subnets:
+            - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet1Id"
+            - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet2Id"
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn:
+            Fn::ImportValue: !Sub "${AppName}-${Environment}-AlbTargetGroupArn"
+
+  # ----------------------
+  # Auto Scaling
+  # ----------------------
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-autoscaling-role"
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: EcsService
+    Properties:
+      ServiceNamespace: ecs
+      ResourceId: !Sub "service/${ECSClusterName}/${AppName}-${Environment}-service"
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 0
+      MaxCapacity: 3
+      RoleARN: !GetAtt AutoScalingRole.Arn
+
+  ScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${AppName}-${Environment}-scale-policy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+Outputs:
+  ServiceName:
+    Description: ECS Service Name
+    Value: !GetAtt EcsService.Name
+    Export:
+      Name: !Sub "${AppName}-${Environment}-ServiceName"
+
+  TaskDefinitionArn:
+    Description: Task Definition ARN
+    Value: !Ref TaskDefinition
+    Export:
+      Name: !Sub "${AppName}-${Environment}-TaskDefinitionArn"
+
+  EcsServiceSecurityGroupId:
+    Description: ECS Service Security Group ID
+    Value: !Ref EcsServiceSecurityGroup
+    Export:
+      Name: !Sub "${AppName}-${Environment}-EcsServiceSgId"

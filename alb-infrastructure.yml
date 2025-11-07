@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ALB stack: Security Group, Application Load Balancer, Target Group, Listener for Tax Service API"
+
+Parameters:
+  AppName:
+    Type: String
+    Default: "tax-service-api"
+  Environment:
+    Type: String
+    Default: "prod"
+    AllowedValues:
+      - "prod"
+      - "staging"
+  ContainerPort:
+    Type: Number
+    Default: 8080
+
+Resources:
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AppName}-${Environment} ALB SG"
+      VpcId:
+        Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-alb-sg"
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-alb"
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet1Id"
+        - Fn::ImportValue: !Sub "${AppName}-${Environment}-PublicSubnet2Id"
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+
+  AlbTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-tg"
+      Protocol: HTTP
+      Port: !Ref ContainerPort
+      VpcId:
+        Fn::ImportValue: !Sub "${AppName}-${Environment}-VpcId"
+      HealthCheckPath: /actuator/health/liveness
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+
+  AlbListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref AlbTargetGroup
+
+Outputs:
+  AlbArn:
+    Description: ALB ARN
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: !Sub "${AppName}-${Environment}-AlbArn"
+
+  AlbDNSName:
+    Description: ALB DNS Name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AppName}-${Environment}-AlbDNS"
+
+  AlbSecurityGroupId:
+    Description: ALB Security Group Id
+    Value: !Ref AlbSecurityGroup
+    Export:
+      Name: !Sub "${AppName}-${Environment}-AlbSecurityGroupId"
+
+  AlbTargetGroupArn:
+    Description: Target Group ARN
+    Value: !Ref AlbTargetGroup
+    Export:
+      Name: !Sub "${AppName}-${Environment}-AlbTargetGroupArn"

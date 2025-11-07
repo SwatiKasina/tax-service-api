@@ -28,6 +28,11 @@ Parameters:
     Default: "tax-service-api"
     Description: "Name of the existing ECR repository to use"
 
+  ECSClusterName:
+    Type: String
+    Default: "tax-service-api-prod-cluster"
+    Description: "Name of the existing ECS cluster to deploy service into"
+
 Resources:
   # ECR Repository for Docker images
   EcrRepository:
@@ -279,25 +284,72 @@ Resources:
               OutputArtifacts:
                 - Name: SourceArtifact
 
-        - Name: Deploy_Infrastructure
+        - Name: Deploy_Network
           Actions:
-            - Name: Deploy_CloudFormation
+            - Name: Deploy_Network_CloudFormation
               ActionTypeId:
                 Category: Deploy
                 Owner: AWS
                 Provider: CloudFormation
                 Version: "1"
               Configuration:
-                StackName: !Sub "${AppName}-${Environment}-infrastructure"
+                StackName: !Sub "${AppName}-${Environment}-network"
                 ActionMode: CREATE_UPDATE
                 RoleArn: !GetAtt CloudFormationExecutionRole.Arn
-                TemplatePath: SourceArtifact::ecs-infrastructure.yml
+                TemplatePath: SourceArtifact::network-infrastructure.yml
+                Capabilities: CAPABILITY_NAMED_IAM
+                ParameterOverrides: !Sub |
+                  {
+                    "Environment": "${Environment}",
+                    "AppName": "${AppName}"
+                  }
+              InputArtifacts:
+                - Name: SourceArtifact
+
+        - Name: Deploy_ALB
+          Actions:
+            - Name: Deploy_ALB_CloudFormation
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: "1"
+              Configuration:
+                StackName: !Sub "${AppName}-${Environment}-alb"
+                ActionMode: CREATE_UPDATE
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn
+                TemplatePath: SourceArtifact::alb-infrastructure.yml
                 Capabilities: CAPABILITY_NAMED_IAM
                 ParameterOverrides: !Sub |
                   {
                     "Environment": "${Environment}",
                     "AppName": "${AppName}",
-                    "ExistingEcrRepoName": "${ExistingEcrRepoName}"
+                    "ContainerPort": "8080"
+                  }
+              InputArtifacts:
+                - Name: SourceArtifact
+
+        - Name: Deploy_ECSInfra
+          Actions:
+            - Name: Deploy_ECS_Service_Infra
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: "1"
+              Configuration:
+                StackName: !Sub "${AppName}-${Environment}-ecs-service"
+                ActionMode: CREATE_UPDATE
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn
+                TemplatePath: SourceArtifact::ecs-service-infrastructure.yml
+                Capabilities: CAPABILITY_NAMED_IAM
+                ParameterOverrides: !Sub |
+                  {
+                    "Environment": "${Environment}",
+                    "AppName": "${AppName}",
+                    "ExistingEcrRepoName": "${ExistingEcrRepoName}",
+                    "ECSClusterName": "${ECSClusterName}",
+                    "DesiredCount": "0"
                   }
               InputArtifacts:
                 - Name: SourceArtifact
@@ -326,7 +378,7 @@ Resources:
                 Provider: ECS
                 Version: "1"
               Configuration:
-                ClusterName: !Sub "${AppName}-${Environment}-cluster"
+                ClusterName: !Ref ECSClusterName
                 ServiceName: !Sub "${AppName}-${Environment}-service"
                 FileName: imagedefinitions.json
               InputArtifacts:
