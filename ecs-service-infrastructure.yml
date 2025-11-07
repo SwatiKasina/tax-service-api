@@ -133,8 +133,8 @@ Resources:
       Family: !Sub "${AppName}-${Environment}-task"
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
-      Cpu: "512"
-      Memory: "1024"
+      Cpu: "1024"
+      Memory: "2048"
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
@@ -155,11 +155,11 @@ Resources:
           HealthCheck:
             Command:
               - CMD-SHELL
-              - curl -f http://localhost:8080/actuator/health/liveness || exit 1
+              - curl -f http://localhost:8080/actuator/health || exit 1
             Interval: 30
             Timeout: 5
             Retries: 3
-            StartPeriod: 60
+            StartPeriod: 180
 
   # ----------------------
   # ECS Cluster
@@ -184,11 +184,12 @@ Resources:
       DesiredCount: !Ref DesiredCount
       LaunchType: FARGATE
       DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
+        MaximumPercent: 100
+        MinimumHealthyPercent: 0
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
+      HealthCheckGracePeriodSeconds: 180
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED

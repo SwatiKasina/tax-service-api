@@ -7,20 +7,29 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class CorsConfig {
+
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/api/**")
-                        // IMPORTANT: exact schemes + hosts
-                        .allowedOriginPatterns(
+                registry.addMapping("/**")
+                        .allowedOrigins(
+
+                                "https://d2g96d75cddiut.cloudfront.net",
+                                "https://api.tkpshivatemple.com",
+
                                 "http://localhost:3000",
-                                "http://swati-tax-frontend.s3-website-us-east-1.amazonaws.com"
+
+
+
+                                "http://tax-frontend.s3-website-us-east-1.amazonaws.com",
+                                "https://tax-frontend.s3-website-us-east-1.amazonaws.com"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
-                        .allowCredentials(false);
+                        .allowCredentials(true)
+                        .maxAge(3600);
             }
         };
     }

@@ -92,7 +92,7 @@ Resources:
         - !Ref ExistingVpcId
         - !ImportValue
           "Fn::Sub": "${AppName}-${Environment}-VpcId"
-      HealthCheckPath: /actuator/health/liveness
+      HealthCheckPath: /actuator/health
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
