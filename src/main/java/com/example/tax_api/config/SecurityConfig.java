@@ -17,7 +17,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll() // preflight
                         .requestMatchers(HttpMethod.GET, "/api/tax/config").permitAll()
-                        .requestMatchers("/actuator/**").permitAll() // allow actuator endpoints for health checks
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator",
+                                "/actuator/**")
+                        .permitAll() // allow actuator endpoints for health checks
                         .anyRequest().authenticated())
                 .build();
     }

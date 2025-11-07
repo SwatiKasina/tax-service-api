@@ -137,6 +137,9 @@ Resources:
                   - cloudformation:DescribeChangeSet
                   - cloudformation:DeleteChangeSet
                   - cloudformation:GetTemplate
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:ListStackResources
                 Resource: "*"
               - Effect: Allow
                 Action: iam:PassRole
