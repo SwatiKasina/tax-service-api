@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tax/config")
-@CrossOrigin(origins = "http://tax-frontend.s3-website-us-east-1.amazonaws.com")
 @Slf4j
 @RequiredArgsConstructor
 public class TaxConfigController {
