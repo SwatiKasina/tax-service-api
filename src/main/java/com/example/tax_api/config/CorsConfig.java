@@ -15,15 +15,10 @@ public class CorsConfig {
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOrigins(
- springboot
+
                                 "https://d2g96d75cddiut.cloudfront.net",
                                 "https://api.tkpshivatemple.com",
-<<<<<<< HEAD
-
- main
-=======
                                 "http://localhost:3000",
->>>>>>> 5023ffa (Fixed Syntax Erors)
                                 "http://tax-frontend.s3-website-us-east-1.amazonaws.com",
                                 "https://tax-frontend.s3-website-us-east-1.amazonaws.com"
                         )
