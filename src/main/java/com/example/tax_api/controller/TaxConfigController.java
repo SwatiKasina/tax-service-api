@@ -16,51 +16,40 @@ public class TaxConfigController {
 
     private final TaxConfigService service;
 
-    // ✅ GET /api/tax/config
+    // GET /api/tax/config
     @GetMapping
     public List<TaxConfig> getAllConfigs() {
         return service.getAllConfigs();
     }
 
-    // ✅ GET /api/tax/config/query
+    // GET /api/tax/config/query
     @GetMapping("/query")
     public List<TaxConfig> getListFromQuery() {
         log.info("Getting data using custom query");
         return service.getListFromQuery();
     }
 
-    // ✅ GET /api/tax/config/{id}
+    // GET /api/tax/config/{id}
     @GetMapping("/{id}")
     public TaxConfig getConfigById(@PathVariable Long id) {
         return service.getConfigById(id);
     }
 
-    // ✅ POST /api/tax/config
+    // POST /api/tax/config
     @PostMapping
     public TaxConfig createConfig(@RequestBody TaxConfig config) {
         return service.createConfig(config);
     }
- springboot
-//put
-    @PutMapping("/{id}")
-    public TaxConfig updateConfig(@PathVariable Long id, @RequestBody TaxConfig updatedTax) {
-        return service.updateConfig(id, updatedTax);
-   main
 
-    // ✅ PUT /api/tax/config/{id}
+    // PUT /api/tax/config/{id}
     @PutMapping("/{id}")
     public TaxConfig updateConfig(@PathVariable Long id, @RequestBody TaxConfig updatedTax) {
         return service.updateConfig(id, updatedTax);
     }
 
-    // ✅ DELETE /api/tax/config/{id}
+    // DELETE /api/tax/config/{id}
     @DeleteMapping("/{id}")
     public void deleteConfig(@PathVariable Long id) {
         service.deleteConfig(id);
     }
- springboot
-
-
-
- main
 }
