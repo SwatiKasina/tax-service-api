@@ -7,6 +7,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class CorsConfig {
+
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
@@ -16,10 +17,13 @@ public class CorsConfig {
                         .allowedOrigins(
  springboot
                                 "https://d2g96d75cddiut.cloudfront.net",
-                                "http://localhost:3000",
                                 "https://api.tkpshivatemple.com",
+<<<<<<< HEAD
 
  main
+=======
+                                "http://localhost:3000",
+>>>>>>> 5023ffa (Fixed Syntax Erors)
                                 "http://tax-frontend.s3-website-us-east-1.amazonaws.com",
                                 "https://tax-frontend.s3-website-us-east-1.amazonaws.com"
                         )
@@ -28,7 +32,6 @@ public class CorsConfig {
                         .allowCredentials(true)
                         .maxAge(3600);
             }
-
         };
     }
 }
