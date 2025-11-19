@@ -47,6 +47,12 @@ public class TaxConfigController {
         return service.updateConfig(id, updatedTax);
    main
 
+    // ✅ PUT /api/tax/config/{id}
+    @PutMapping("/{id}")
+    public TaxConfig updateConfig(@PathVariable Long id, @RequestBody TaxConfig updatedTax) {
+        return service.updateConfig(id, updatedTax);
+    }
+
     // ✅ DELETE /api/tax/config/{id}
     @DeleteMapping("/{id}")
     public void deleteConfig(@PathVariable Long id) {
