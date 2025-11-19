@@ -40,10 +40,18 @@ public class TaxConfigController {
     public TaxConfig createConfig(@RequestBody TaxConfig config) {
         return service.createConfig(config);
     }
+//put
+    @PutMapping("/{id}")
+    public TaxConfig updateConfig(@PathVariable Long id, @RequestBody TaxConfig updatedTax) {
+        return service.updateConfig(id, updatedTax);
+    }
 
     // ✅ DELETE /api/tax/config/{id}
     @DeleteMapping("/{id}")
     public void deleteConfig(@PathVariable Long id) {
         service.deleteConfig(id);
     }
+
+
+
 }

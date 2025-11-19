@@ -1,5 +1,6 @@
 package com.example.tax_api.service;
 
+import com.example.tax_api.controller.TaxConfigController;
 import com.example.tax_api.model.TaxConfig;
 import com.example.tax_api.repository.TaxConfigRepository;
 import org.springframework.http.HttpStatus;
@@ -35,9 +36,22 @@ public class TaxConfigService {
                         HttpStatus.NOT_FOUND, "TaxConfig not found with id: " + id));
     }
 
+    public TaxConfig updateConfig(Long id, TaxConfig updatedTax) {
+        TaxConfig tax = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "TaxConfig not found with id: " + id));
+        tax.setDisplayName(updatedTax.getDisplayName());
+        tax.setKeyName(updatedTax.getKeyName());
+        tax.setPercentage(updatedTax.getPercentage());
+        return repository.save(tax);
+    }
+
     public void deleteConfig(Long id) {
         repository.deleteById(id);
     }
+
+
+
 }
 
 
