@@ -14,6 +14,6 @@ public class PosSaleRequest {
 
     private CardDetails cardDetails;
     private CustomerDetails customerDetails;
-    private ItemDetail itemDetails;
+    private ItemDetails itemDetails;
 
 }

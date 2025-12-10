@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class PaymentService {
 
+
     private final RestTemplate restTemplate;
 
 
@@ -25,7 +26,7 @@ public class PaymentService {
 
         PaymentRequest paymentRequest = new PaymentRequest();
         paymentRequest.setCardDetails(cardDetails);
-        paymentRequest.setPaymentAmount(0D);
+        paymentRequest.setPaymentAmount(paymentAmount);
 
         //TODO override method
         log.info (String.format("Calling payment service using : %s", paymentRequest.toString()));

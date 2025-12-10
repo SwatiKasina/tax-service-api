@@ -9,9 +9,10 @@ import lombok.Setter;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ItemDetail {
+public class ItemDetails {
 
     private String productDesc;
     private String skuNumber;
     private String vendorName;
+    private double ProdAmount;
 }
