@@ -38,5 +38,5 @@ phases:
 artifacts:
   files:
     - imagedefinitions.json
-    - ecs-infrastructure.yml
+
 
