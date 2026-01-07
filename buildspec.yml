@@ -32,11 +32,12 @@ phases:
     commands:
       - docker push "${REPOSITORY_URI}:${IMAGE_TAG}"
       - docker push "${REPOSITORY_URI}:${SHORT_SHA}"
-      - CONTAINER_NAME="app"   # must match your ECS task definition
+      - CONTAINER_NAME="app"
       - printf '[{"name":"%s","imageUri":"%s:%s"}]' "$CONTAINER_NAME" "$REPOSITORY_URI" "$IMAGE_TAG" > imagedefinitions.json
 
 artifacts:
   files:
     - imagedefinitions.json
+    - ecs-infrastructure.yml
 
 
