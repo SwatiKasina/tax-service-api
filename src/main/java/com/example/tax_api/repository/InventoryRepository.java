@@ -10,7 +10,6 @@ import java.util.List;
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, String> {
 
-    @Query(value = "SELECT * FROM dolly.inventory", nativeQuery = true)
-    List<Inventory> getListFromQuery();
+
 }
 
