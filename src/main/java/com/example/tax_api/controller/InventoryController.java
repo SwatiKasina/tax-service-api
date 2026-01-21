@@ -17,7 +17,7 @@ import java.util.List;
 @Slf4j
 
 @RequiredArgsConstructor
-@RequestMapping("/api")
+@RequestMapping("/api/inventory")
 
 
 public class InventoryController {
@@ -35,7 +35,7 @@ public class InventoryController {
         }
     }
 
-    @GetMapping("/inventory")
+    @GetMapping
     public ResponseEntity<List<Inventory>> getAllProducts() {
         List<Inventory> inv = inventoryService.getAllInventory();
         return ResponseEntity.ok(inv);
