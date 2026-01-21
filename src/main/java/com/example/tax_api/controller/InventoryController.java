@@ -3,8 +3,7 @@ package com.example.tax_api.controller;
 import com.example.tax_api.model.Inventory;
 import com.example.tax_api.model.PosSaleRequest;
 import com.example.tax_api.service.InventoryService;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -15,13 +14,10 @@ import java.util.List;
 
 @RestController
 @Slf4j
-
 @RequiredArgsConstructor
- inventory-branch
 @RequestMapping("/api/inventory")
 
-@RequestMapping("/api")
- main
+
 
 
 public class InventoryController {
@@ -39,11 +35,10 @@ public class InventoryController {
         }
     }
 
- inventory-branch
+
     @GetMapping
 
-    @GetMapping("/inventory")
- main
+
     public ResponseEntity<List<Inventory>> getAllProducts() {
         List<Inventory> inv = inventoryService.getAllInventory();
         return ResponseEntity.ok(inv);
@@ -51,7 +46,7 @@ public class InventoryController {
 
     @PostMapping
             (
-                    value = "/row", consumes = MediaType.APPLICATION_JSON_VALUE,
+                    consumes = MediaType.APPLICATION_JSON_VALUE,
                     produces = MediaType.APPLICATION_JSON_VALUE
             )
     public ResponseEntity<?> addnewRow(@RequestBody Inventory inventory) {
