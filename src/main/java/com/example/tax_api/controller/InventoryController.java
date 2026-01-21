@@ -14,13 +14,10 @@ import java.util.List;
 
 @RestController
 @Slf4j
-
 @RequiredArgsConstructor
- inventory-branch
 @RequestMapping("/api/inventory")
 
-@RequestMapping("/api")
- main
+
 
 
 public class InventoryController {
@@ -38,11 +35,10 @@ public class InventoryController {
         }
     }
 
- inventory-branch
+
     @GetMapping
 
-    @GetMapping("/inventory")
- main
+
     public ResponseEntity<List<Inventory>> getAllProducts() {
         List<Inventory> inv = inventoryService.getAllInventory();
         return ResponseEntity.ok(inv);
