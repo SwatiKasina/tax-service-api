@@ -19,7 +19,8 @@ public class CorsConfig {
                                 "https://api.tkpshivatemple.com",
                                 "http://localhost:3000",
                                 "http://tax-frontend.s3-website-us-east-1.amazonaws.com",
-                                "https://tax-frontend.s3-website-us-east-1.amazonaws.com"
+                                "https://tax-frontend.s3-website-us-east-1.amazonaws.com",
+                                "http://inventory-table-frontend.s3-website-us-east-1.amazonaws.com/mvn"
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
