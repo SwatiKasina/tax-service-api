@@ -34,7 +34,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
-                "http://tax-frontend.s3-website-us-east-1.amazonaws.com"));
+                "http://tax-frontend.s3-website-us-east-1.amazonaws.com",
+        "http://inventory-table-frontend.s3-website-us-east-1.amazonaws.com/"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
